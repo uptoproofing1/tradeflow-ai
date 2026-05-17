@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#09090b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TradeFlow AI">
+<title>TradeFlow AI</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&family=Poppins:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#000;font-family:'DM Sans',system-ui,sans-serif;overflow:hidden}
+button{cursor:pointer;font-family:'DM Sans',sans-serif}
+input,textarea,select{font-family:'DM Sans',sans-serif;-webkit-appearance:none}
+::-webkit-scrollbar{display:none}
+*{-ms-overflow-style:none;scrollbar-width:none}
+@keyframes sup{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes dp{0%,100%{transform:scale(.5);opacity:.3}50%{transform:scale(1.1);opacity:1}}
+@keyframes rip{0%{transform:scale(1);opacity:.4}100%{transform:scale(2.5);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fi{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;background:#3f3f46;border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;cursor:pointer;box-shadow:0 0 10px rgba(37,99,235,.5);background:#2563eb}
+.modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:flex-end;justify-content:center;animation:fi .2s ease}
+.modal-sheet{background:#18181b;border-radius:20px 20px 0 0;width:100%;max-height:90%;overflow-y:auto;animation:slideUp .25s ease;padding:0 0 40px}
+.modal-handle{width:40px;height:4px;background:#3f3f46;border-radius:2px;margin:12px auto 16px}
+.inp{width:100%;background:#27272a;border:1px solid #3f3f46;border-radius:12px;padding:13px 14px;font-size:15px;color:#fff;outline:none;display:block;margin-bottom:12px}
+.inp:focus{border-color:#2563eb}
+.lbl{font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:block}
+</style>
+</head>
+<body>
+<div id="root" style="display:flex;align-items:center;justify-content:center;height:100vh;background:#000;position:relative"></div>
+<div id="modal-root"></div>
+<script>
+'use strict';
+
+const API='https://tradeflow-api-88z6.onrender.com';
+const MRATE=0.31;
+const ADMIN_PW='TF@ADMIN.2026';
+const TRIAL_DAYS=7;
+
+// ─── STORAGE ─────────────────────────────────────────────
+const DB={
+  get:(k,d=null)=>{try{const v=localStorage.getItem('tf_'+k);return v!=null?JSON.parse(v):d}catch{return d}},
+  set:(k,v)=>{try{localStorage.setItem('tf_'+k,JSON.stringify(v))}catch{}},
+};
+
+// ─── STATE ───────────────────────────────────────────────
+const S={
+  phase:'splash',
+  screen:'dashboard',
+  jobs:      DB.get('jobs',[]),
+  invoices:  DB.get('invoices',[]),
+  trips:     DB.get('trips',[]),
+  materials: DB.get('materials',[]),
+  receipts:  DB.get('receipts',[]),
+  profile:   DB.get('profile',{name:'',company:'',location:'',phone:''}),
+  gst:       DB.get('gst',0.15),
+  voice:     DB.get('voice',{on:true,accent:'nz',gender:'m',style:'tradie',speed:1.0}),
+  theme:     DB.get('theme','Navy'),
+  pin:       DB.get('pin','1234'),
+  country:   DB.get('country','New Zealand'),
+  workers:   DB.get('workers',[]),
+  authUser:  DB.get('authUser',null),
+  authToken: DB.get('authToken',null),
+  isAdmin:   DB.get('isAdmin',false),
+  subStatus: DB.get('subStatus',null),
+  trialStart:DB.get('trialStart',null),
+  authMode:'login',authLoading:false,authError:'',
+  pinBuf:'',pinAttempts:0,
+  activeTrip:null,tripKm:0,gpsWatch:null,
+  voiceRec:false,voiceText:'',voiceQuote:null,voiceTimer:0,voiceInterval:null,
+  safetyTab:'Hazards',safetyPhotos:[],safetyHazards:[],safetyToolbox:null,safetyLoading:false,
+  scanLoading:false,scanItems:[],scanSupplier:'',scanDone:false,
+  emailDraft:'',emailLoading:false,emailSent:false,
+  matSearch:'',
+  receiptFilter:'All',receiptLoading:false,
+  invFilter:'All',jobsFilter:'All',
+};
+const save=k=>DB.set(k,S[k]);
+const go=s=>{S.screen=s;closeModal();renderApp()};
+
+// ─── THEMES ──────────────────────────────────────────────
+const THEMES={
+  'Light Blue':{a:'#2563eb',b:'rgba(37,99,235,.15)',c:'rgba(37,99,235,.3)',d:'#60a5fa'},
+  'Sky Blue':  {a:'#0ea5e9',b:'rgba(14,165,233,.15)',c:'rgba(14,165,233,.3)',d:'#38bdf8'},
+  'Navy':      {a:'#1e40af',b:'rgba(30,64,175,.15)', c:'rgba(30,64,175,.3)', d:'#3b82f6'},
+  'Teal':      {a:'#0d9488',b:'rgba(13,148,136,.15)',c:'rgba(13,148,136,.3)',d:'#2dd4bf'},
+  'Indigo':    {a:'#6366f1',b:'rgba(99,102,241,.15)',c:'rgba(99,102,241,.3)',d:'#818cf8'},
+  'Slate':     {a:'#475569',b:'rgba(71,85,105,.15)', c:'rgba(71,85,105,.3)', d:'#94a3b8'},
+};
+const T=()=>THEMES[S.theme]||THEMES['Navy'];
+
+// ─── MODAL SYSTEM ─────────────────────────────────────────
+const showModal=html=>{
+  const mr=document.getElementById('modal-root');
+  if(!mr)return;
+  mr.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-sheet">${html}</div></div>`;
+  // Focus first input after render
+  setTimeout(()=>{const inp=mr.querySelector('input,textarea');if(inp)inp.focus();},100);
+};
+const closeModal=()=>{const mr=document.getElementById('modal-root');if(mr)mr.innerHTML='';};
+window.closeModal=closeModal;
+
+// ─── VOICE ENGINE ─────────────────────────────────────────
+let curAudio=null;
+const styleText=(t,sty)=>{
+  if(sty!=='tradie')return t;
+  return t.replace(/Good morning/g,"G'day").replace(/Good afternoon/g,"Hey, afternoon").replace(/Thank you/g,"Cheers").replace(/Please /g,"Just ");
+};
+const speak=async raw=>{
+  const v=S.voice;if(!v.on)return;
+  const text=styleText(raw,v.style);
+  if(curAudio){curAudio.pause();curAudio=null}
+  if(window.speechSynthesis)window.speechSynthesis.cancel();
+  try{
+    const res=await fetch(`${API}/api/speak`,{method:'POST',headers:{'Content-Type':'application/json','Accept':'audio/mpeg'},mode:'cors',body:JSON.stringify({text,accent:v.accent||'nz',gender:v.gender||'m',style:v.style||'tradie',speed:v.speed||1})});
+    if(!res.ok)throw new Error(res.status);
+    const blob=await res.blob();
+    if(blob.size<100)throw new Error('empty');
+    const url=URL.createObjectURL(blob);
+    curAudio=new Audio(url);curAudio.volume=1;
+    await curAudio.play();
+    curAudio.onended=()=>URL.revokeObjectURL(url);
+  }catch{
+    if(!window.speechSynthesis)return;
+    const u=new SpeechSynthesisUtterance(text);
+    u.rate=v.speed||1;u.pitch=v.gender==='f'?1.1:.88;
+    const vs=window.speechSynthesis.getVoices();
+    const vv=vs.find(x=>/daniel|alex|gordon/i.test(x.name)&&x.lang.startsWith('en'));
+    if(vv)u.voice=vv;
+    window.speechSynthesis.speak(u);
+  }
+};
+
+// ─── UTILS ───────────────────────────────────────────────
+const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const $=id=>document.getElementById(id);
+const money=(n,c=false)=>'$'+(+(n)||0).toLocaleString('en-NZ',{minimumFractionDigits:c?2:0,maximumFractionDigits:c?2:0});
+const dateStr=d=>new Date(d).toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'});
+const trialDaysLeft=()=>{if(!S.trialStart)return TRIAL_DAYS;return Math.max(0,TRIAL_DAYS-Math.ceil((Date.now()-S.trialStart)/(864e5)));};
+
+const BDGE={
+  Approved:'color:#4ade80;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3)',
+  Sent:'color:#60a5fa;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3)',
+  Draft:'color:#a1a1aa;background:rgba(63,63,70,.5);border:1px solid rgba(82,82,91,.5)',
+  Paid:'color:#4ade80;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3)',
+  Overdue:'color:#f87171;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3)',
+  'Due Soon':'color:#fbbf24;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3)',
+  'In Progress':'color:#60a5fa;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3)',
+  Booked:'color:#4ade80;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3)',
+  Lead:'color:#fbbf24;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3)',
+  Completed:'color:#a1a1aa;background:rgba(63,63,70,.5);border:1px solid rgba(82,82,91,.5)',
+  Critical:'color:#f87171;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3)',
+  High:'color:#fbbf24;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3)',
+  Medium:'color:#60a5fa;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3)',
+};
+const badge=s=>`<span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;${BDGE[s]||'color:#a1a1aa;background:rgba(63,63,70,.5);border:1px solid rgba(82,82,91,.5)'}">${esc(s)}</span>`;
+
+const IC={
+  home:'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
+  jobs:'M20 6h-2.18c.07-.44.18-.88.18-1.33C18 2.54 15.96.5 13.5.5S9 2.54 9 4.67c0 .45.1.89.18 1.33H7c-1.11 0-1.99.89-1.99 2L5 20c0 1.11.89 2 2 2h12c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z',
+  doc:'M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z',
+  mic:'M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z',
+  more:'M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z',
+  shield:'M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z',
+  car:'M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99z',
+  mail:'M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z',
+  scan:'M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z',
+  cog:'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z',
+  plus:'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
+  check:'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
+  send:'M2.01 21L23 12 2.01 3 2 10l15 2-15 2z',
+  back:'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
+  trash:'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+  lock:'M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z',
+  cam:'M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z',
+  edit:'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
+  exp:'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z',
+  chev:'M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z',
+  user:'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
+  del:'M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z',
+};
+const ic=(n,sz=20,col='currentColor')=>`<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="${col}"><path d="${IC[n]||IC.more}"/></svg>`;
+
+// TF LOGO
+const logo=(sz=40)=>{const sc=sz/34;return`<div style="width:${sz}px;height:${sz}px;border-radius:${sz*.26}px;flex-shrink:0;background:linear-gradient(145deg,#1565ff 0%,#0d3f9e 55%,#071b3d 100%);box-shadow:0 0 ${sz*.35}px rgba(21,101,255,.45);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative"><div style="position:relative;width:${sc*22}px;height:${sc*17}px"><div style="position:absolute;left:0;top:0;width:${sc*14}px;height:${sc*5}px;background:#fff;border-radius:4px 1px;transform:skewX(-14deg)"></div><div style="position:absolute;left:${sc*4}px;top:${sc*3}px;width:${sc*5}px;height:${sc*14}px;background:#fff;border-radius:1px 1px 4px 4px;transform:skewX(-14deg)"></div><div style="position:absolute;left:${sc*12}px;top:${sc*6}px;width:${sc*10}px;height:${sc*4}px;background:#1db7ff;border-radius:4px 1px;transform:skewX(-14deg)"></div><div style="position:absolute;left:${sc*11}px;top:${sc*11}px;width:${sc*9}px;height:${sc*4}px;background:#168dff;border-radius:4px 1px;transform:skewX(-14deg)"></div></div></div>`;};
+const wm=(fs=17,dark=false)=>`<div style="font-family:'Poppins',sans-serif;font-size:${fs}px;font-weight:800;letter-spacing:-.4px;line-height:1"><span style="color:${dark?'#0f172a':'#fff'}">Trade</span><span style="color:#0d8cff">Flow</span><span style="margin-left:5px;padding:2px 7px;border-radius:6px;background:linear-gradient(145deg,#168dff,#0d6cff);color:#fff;font-size:${fs*.62}px;font-weight:800;vertical-align:middle">AI</span></div>`;
+
+// SHARED UI
+const card=(h,sty='')=>`<div style="background:#18181b;border:1px solid #27272a;border-radius:16px;overflow:hidden;${sty}">${h}</div>`;
+const st=t=>`<div style="font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.08em;padding:20px 16px 8px">${t}</div>`;
+const DV=`<div style="border-bottom:1px solid #27272a"></div>`;
+const spin=`<div style="width:20px;height:20px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle"></div>`;
+const empty=(i,t,s,a='')=>`<div style="display:flex;flex-direction:column;align-items:center;padding:40px 24px;text-align:center;gap:8px">${ic(i,36,'#3f3f46')}<div style="font-size:14px;font-weight:700;color:#52525b">${t}</div><div style="font-size:12px;color:#3f3f46;line-height:1.5;max-width:220px">${s}</div>${a}</div>`;
+const pbtn=(l,f,s='')=>{const t=T();return`<button onclick="${f}" style="width:100%;background:${t.a};color:#fff;font-weight:700;font-size:14px;padding:14px;border-radius:16px;border:none;cursor:pointer;box-shadow:0 4px 16px ${t.c};${s}">${l}</button>`;};
+const plusBtn=(f)=>{const t=T();return`<button onclick="${f}" style="width:32px;height:32px;border-radius:10px;background:${t.a};border:none;display:flex;align-items:center;justify-content:center">${ic('plus',18,'#fff')}</button>`;};
+const hdr=(title,back,act='')=>{const t=T();return`<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 16px 12px;flex-shrink:0">${back?`<button onclick="go('${back}')" style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer">${ic('back',18,t.d)}<span style="font-size:20px;font-weight:800;color:#fff">${title}</span></button>`:`<span style="font-size:20px;font-weight:800;color:#fff">${title}</span>`}${act||'<div style="width:32px"></div>'}</div>`;};
+const pills=(opts,active,fn)=>`<div style="display:flex;gap:8px;padding:0 16px 8px;overflow-x:auto">${opts.map(o=>{const t=T();return`<button onclick="${fn}('${o.replace(/'/g,"\\'")}');renderApp()" style="flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:${active===o?t.a:'#27272a'};color:${active===o?'#fff':'#71717a'}">${o}</button>`;}).join('')}</div>`;
+
+// ─── AUTH ─────────────────────────────────────────────────
+const renderAuth=()=>{
+  const t=T(),isSU=S.authMode==='signup',isAD=S.authMode==='admin';
+  return`<div style="width:min(390px,100vw);height:min(844px,100vh);background:linear-gradient(160deg,#040c24 0%,#0f2875 45%,#1a4fc4 100%);border-radius:clamp(0px,3vw,28px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 28px 40px;box-shadow:0 30px 80px rgba(0,0,0,.9);overflow-y:auto">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:28px">${logo(68)}${wm(22)}<div style="font-size:11px;color:rgba(147,197,253,.5);letter-spacing:.1em;text-transform:uppercase">Built on the tools.</div></div>
+    <div style="display:flex;background:rgba(255,255,255,.08);border-radius:14px;padding:4px;gap:4px;margin-bottom:24px;width:100%">
+      ${[['login','Login'],['signup','Sign Up'],['admin','Admin']].map(([m,l])=>`<button onclick="S.authMode='${m}';S.authError='';renderApp()" style="flex:1;padding:8px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-weight:700;background:${S.authMode===m?'rgba(255,255,255,.15)':'transparent'};color:${S.authMode===m?'#fff':'rgba(255,255,255,.4)'}">${l}</button>`).join('')}
+    </div>
+    ${S.authError?`<div style="width:100%;padding:10px 14px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:12px;color:#f87171;font-size:13px;margin-bottom:16px;text-align:center">${esc(S.authError)}</div>`:''}
+    <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+      ${isAD?`
+        <div style="font-size:13px;color:rgba(147,197,253,.7);text-align:center;margin-bottom:4px">Admin access — bypasses subscription</div>
+        <input id="a-apw" type="password" placeholder="Admin password" autocomplete="off" style="width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px 16px;font-size:15px;color:#fff;outline:none">
+        <button onclick="doAdmin()" style="width:100%;padding:14px;border-radius:14px;background:${t.a};color:#fff;font-weight:700;font-size:15px;border:none;cursor:pointer">${S.authLoading?spin:'Enter as Admin'}</button>
+      `:`
+        ${isSU?`<input id="a-nm" type="text" placeholder="Your name" autocomplete="name" style="width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px 16px;font-size:15px;color:#fff;outline:none">
+        <input id="a-co" type="text" placeholder="Company name" autocomplete="organization" style="width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px 16px;font-size:15px;color:#fff;outline:none">`:''}
+        <input id="a-em" type="email" placeholder="Email address" autocomplete="email" style="width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px 16px;font-size:15px;color:#fff;outline:none">
+        <input id="a-pw" type="password" placeholder="Password" autocomplete="${isSU?'new':'current'}-password" style="width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px 16px;font-size:15px;color:#fff;outline:none">
+        <button onclick="${isSU?'doSignup()':'doLogin()'}" style="width:100%;padding:14px;border-radius:14px;background:${t.a};color:#fff;font-weight:700;font-size:15px;border:none;cursor:pointer">${S.authLoading?spin:isSU?'Create Account — 7 Day Free Trial':'Log In'}</button>
+      `}
+    </div>
+    ${!isAD?`<div style="margin-top:20px;font-size:12px;color:rgba(147,197,253,.4);text-align:center;line-height:1.6">7-day free trial · Then $79/month<br>Cancel anytime</div>`:''}
+  </div>`;
+};
+
+window.doAdmin=()=>{
+  const pw=$('a-apw')?.value;
+  if(pw===ADMIN_PW){S.isAdmin=true;S.subStatus='active';DB.set('isAdmin',true);DB.set('subStatus','active');S.phase='pin';renderApp();}
+  else{S.authError='Incorrect admin password';renderApp();}
+};
+
+window.doSignup=async()=>{
+  const email=$('a-em')?.value?.trim(),pw=$('a-pw')?.value,name=$('a-nm')?.value?.trim()||'',company=$('a-co')?.value?.trim()||'';
+  if(!email||!pw){S.authError='Please enter email and password';renderApp();return;}
+  if(pw.length<6){S.authError='Password must be at least 6 characters';renderApp();return;}
+  S.authLoading=true;S.authError='';renderApp();
+  try{
+    const res=await fetch(`${API}/api/auth/signup`,{method:'POST',headers:{'Content-Type':'application/json'},mode:'cors',body:JSON.stringify({email,password:pw,name,company})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'Signup failed');
+    S.authUser={email,name,company};S.authToken=data.token||null;S.subStatus='trial';S.trialStart=Date.now();
+    if(name)S.profile.name=name;if(company)S.profile.company=company;
+    DB.set('authUser',S.authUser);DB.set('authToken',S.authToken);DB.set('subStatus','trial');DB.set('trialStart',S.trialStart);DB.set('profile',S.profile);
+    S.phase='pin';
+  }catch(e){S.authError=e.message||'Signup failed. Try again.';}
+  S.authLoading=false;renderApp();
+};
+
+window.doLogin=async()=>{
+  const email=$('a-em')?.value?.trim(),pw=$('a-pw')?.value;
+  if(!email||!pw){S.authError='Please enter email and password';renderApp();return;}
+  S.authLoading=true;S.authError='';renderApp();
+  try{
+    const res=await fetch(`${API}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},mode:'cors',body:JSON.stringify({email,password:pw})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'Login failed');
+    S.authUser=data.user||{email};S.authToken=data.token||null;S.subStatus=data.subStatus||'trial';S.trialStart=data.trialStart||Date.now();
+    if(S.authUser.name)S.profile.name=S.authUser.name;if(S.authUser.company)S.profile.company=S.authUser.company;
+    DB.set('authUser',S.authUser);DB.set('authToken',S.authToken);DB.set('subStatus',S.subStatus);DB.set('trialStart',S.trialStart);DB.set('profile',S.profile);
+    S.phase='pin';
+  }catch(e){S.authError=e.message||'Login failed. Check your details.';}
+  S.authLoading=false;renderApp();
+};
+
+window.doLogout=()=>{
+  if(!confirm('Log out of TradeFlow AI?'))return;
+  ['authUser','authToken','isAdmin','subStatus','trialStart'].forEach(k=>DB.set(k,null));
+  S.authUser=null;S.authToken=null;S.isAdmin=false;S.subStatus=null;S.phase='auth';renderApp();
+};
+
+// ─── PIN ──────────────────────────────────────────────────
+let pinBuf='',pinAttempts=0;
+const pinDots=(shake=false)=>[0,1,2,3].map(i=>`<div style="width:16px;height:16px;border-radius:50%;border:2px solid ${i<pinBuf.length?(shake?'#f87171':'#fff'):'rgba(255,255,255,.3)'};background:${i<pinBuf.length?(shake?'#f87171':'#fff'):'transparent'};transform:${i<pinBuf.length?'scale(1.1)':'scale(1)'};transition:all .15s"></div>`).join('');
+window.pk=k=>{
+  if(pinBuf.length>=4)return;
+  pinBuf+=k;
+  const d=$('pin-dots');if(d)d.innerHTML=pinDots();
+  if(pinBuf.length===4){
+    setTimeout(()=>{
+      if(pinBuf===S.pin){pinBuf='';pinAttempts=0;S.phase='app';renderApp();}
+      else{pinAttempts++;const d=$('pin-dots');if(d)d.innerHTML=pinDots(true);const e=$('pin-err');if(e)e.textContent='Wrong PIN — try again';setTimeout(()=>{pinBuf='';const d=$('pin-dots');if(d)d.innerHTML=pinDots();},600);}
+    },80);
+  }
+};
+window.pdel=()=>{pinBuf=pinBuf.slice(0,-1);const d=$('pin-dots');if(d)d.innerHTML=pinDots();};
+window.unlockApp=()=>{S.phase='app';renderApp();};
+
+// ─── DASHBOARD ────────────────────────────────────────────
+const renderDash=()=>{
+  const h=new Date().getHours(),t=T();
+  const gr=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
+  const nm=S.profile.name?`, ${S.profile.name.split(' ')[0]}`:'';
+  const rev=S.invoices.filter(i=>i.status==='Paid').reduce((a,i)=>a+(i.amount||0),0);
+  const d=new Date(),DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],MONS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return`<div style="height:100%;overflow-y:auto">
+    <div style="padding:20px 16px 12px;display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-size:13px;color:#71717a">${DAYS[d.getDay()]}, ${d.getDate()} ${MONS[d.getMonth()]} ${d.getFullYear()}</div><div style="font-size:21px;font-weight:800;color:#fff;margin-top:2px">${gr}${nm} 👋</div></div>
+      <div style="display:flex;gap:8px;align-items:center"><button onclick="go('email')" style="width:36px;height:36px;border-radius:10px;background:#27272a;border:1px solid #3f3f46;display:flex;align-items:center;justify-content:center;position:relative">${ic('mail',16,'#71717a')}</button>${logo(34)}</div>
+    </div>
+    <div style="margin:0 16px;border-radius:18px;padding:20px;background:linear-gradient(135deg,${t.a} 0%,${t.a}cc 60%,${t.a}88 100%);box-shadow:0 8px 32px ${t.c};position:relative;overflow:hidden">
+      <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.05)"></div>
+      <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.08em">Total Revenue — Paid</div>
+      <div style="font-size:38px;font-weight:900;color:#fff;margin-top:4px;letter-spacing:-1px">${money(rev)}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:4px">${S.invoices.filter(i=>i.status==='Paid').length} paid invoices</div>
+    </div>
+    <div style="display:flex;gap:10px;margin:12px 16px 0">
+      ${[{l:'Active Jobs',v:S.jobs.filter(j=>j.status!=='Completed').length,c:'#60a5fa'},{l:'Outstanding',v:S.invoices.filter(i=>i.status!=='Paid').length,c:'#f87171'},{l:'Trips',v:S.trips.length,c:'#fbbf24'}].map(s=>`<div style="flex:1;background:#18181b;border:1px solid #27272a;border-radius:12px;padding:12px"><div style="font-size:24px;font-weight:900;color:${s.c}">${s.v}</div><div style="font-size:11px;color:#71717a;margin-top:2px">${s.l}</div></div>`).join('')}
+    </div>
+    ${st('Quick Actions')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px">
+      ${[{l:'Voice Quote',i:'mic',sub:'Speak & generate',bg:'rgba(59,130,246,.1)',br:'rgba(59,130,246,.3)',c:'#60a5fa',s:'voice'},{l:'Safety Pack',i:'shield',sub:'AI hazard analysis',bg:'rgba(239,68,68,.1)',br:'rgba(239,68,68,.3)',c:'#f87171',s:'safety'},{l:'Mileage GPS',i:'car',sub:'Log a work trip',bg:'rgba(245,158,11,.1)',br:'rgba(245,158,11,.3)',c:'#fbbf24',s:'mileage'},{l:'Receipt Logger',i:'scan',sub:'AI spending tracker',bg:'rgba(251,146,60,.1)',br:'rgba(251,146,60,.3)',c:'#fb923c',s:'receipts'}].map(a=>`<button onclick="go('${a.s}')" style="background:${a.bg};border:1px solid ${a.br};border-radius:16px;padding:16px;text-align:left;cursor:pointer">${ic(a.i,22,a.c)}<div style="font-size:13px;font-weight:700;color:#fff;margin-top:8px">${a.l}</div><div style="font-size:11px;color:#71717a;margin-top:2px">${a.sub}</div></button>`).join('')}
+    </div>
+    ${st('Active Jobs')}
+    ${card(S.jobs.filter(j=>j.status!=='Completed').length===0?empty('jobs','No active jobs','Tap the mic button to create your first voice quote',`<button onclick="go('voice')" style="background:${t.a};color:#fff;padding:8px 16px;border-radius:10px;font-size:12px;border:none;cursor:pointer;margin-top:4px">Create Quote</button>`):S.jobs.filter(j=>j.status!=='Completed').slice(0,5).map((j,i,a)=>`<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;${i<a.length-1?'border-bottom:1px solid #27272a':''}"><div style="width:36px;height:36px;border-radius:10px;background:${t.b};display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('jobs',16,t.d)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</div><div style="font-size:11px;color:#71717a">${esc(j.client)}</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:700;color:#fff">${money(j.value)}</div>${badge(j.status)}</div></div>`).join(''),'margin:0 16px')}
+    <div style="height:16px"></div>
+  </div>`;
+};
+
+// ─── JOBS ─────────────────────────────────────────────────
+const STAGES=['Lead','Booked','In Progress','Completed'];
+const renderJobs=()=>{
+  const t=T(),list=S.jobsFilter==='All'?S.jobs:S.jobs.filter(j=>j.status===S.jobsFilter);
+  return`<div style="height:100%;overflow-y:auto">
+    ${hdr('Jobs Pipeline','',plusBtn("openJobForm()"))}
+    <div style="display:flex;gap:10px;margin:0 16px 12px">${STAGES.map((s,i)=>`<div style="flex:1;background:#18181b;border:1px solid #27272a;border-radius:12px;padding:8px 4px;text-align:center"><div style="font-size:20px;font-weight:900;color:${['#fbbf24','#4ade80','#60a5fa','#a1a1aa'][i]}">${S.jobs.filter(j=>j.status===s).length}</div><div style="font-size:9px;color:#52525b;margin-top:2px">${s}</div></div>`).join('')}</div>
+    ${pills(['All',...STAGES],S.jobsFilter,`f=>{S.jobsFilter=f`)}
+    ${card(list.length===0?empty('jobs','No jobs yet','Tap + to add your first job'):list.map((j,i)=>`<div style="padding:16px;${i<list.length-1?'border-bottom:1px solid #27272a':''}"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px"><div style="flex:1;min-width:0;margin-right:8px"><div style="font-size:13px;font-weight:700;color:#fff">${esc(j.title)}</div><div style="font-size:11px;color:#71717a;margin-top:1px">${esc(j.client)}</div></div><div style="display:flex;align-items:center;gap:6px">${badge(j.status)}<button onclick="delJob(${j.id})" style="background:none;border:none;padding:4px;cursor:pointer">${ic('trash',14,'#52525b')}</button></div></div><div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:15px;font-weight:900;color:${t.d}">${money(j.value)}</span><div style="display:flex;gap:5px">${STAGES.filter(s=>s!==j.status).slice(0,2).map(s=>`<button onclick="upJob(${j.id},'${s}')" style="font-size:10px;padding:4px 8px;border-radius:7px;background:#27272a;color:#71717a;border:none;cursor:pointer">${s==='Completed'?'✓ Done':s==='In Progress'?'→ Progress':'→ '+s}</button>`).join('')}</div></div></div>`).join(''),'margin:0 16px 16px')}
+  </div>`;
+};
+window.openJobForm=()=>{
+  const t=T();
+  showModal(`<div class="modal-handle"></div><div style="padding:0 20px 20px">
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:16px">+ New Job</div>
+    <label class="lbl">Job Title</label><input class="inp" id="jf-t" type="text" placeholder="e.g. Roof Replacement" autocomplete="off">
+    <label class="lbl">Client Name</label><input class="inp" id="jf-c" type="text" placeholder="e.g. John Smith" autocomplete="off">
+    <label class="lbl">Value ($)</label><input class="inp" id="jf-v" type="number" inputmode="decimal" placeholder="0.00">
+    <label class="lbl" style="margin-bottom:8px">Stage</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="stage-btns">
+      ${STAGES.map((s,i)=>`<button onclick="selectStage('${s}')" id="sb-${i}" style="padding:6px 12px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:${i===0?t.a:'#27272a'};color:${i===0?'#fff':'#71717a'}">${s}</button>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal()" style="flex:1;padding:13px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:14px">Cancel</button>
+      <button onclick="saveJob()" style="flex:1;padding:13px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700">Add Job</button>
+    </div>
+  </div>`);
+  window._jobStage='Lead';
+};
+window.selectStage=s=>{
+  window._jobStage=s;
+  const t=T();
+  STAGES.forEach((st,i)=>{const b=$(`sb-${i}`);if(b){b.style.background=st===s?t.a:'#27272a';b.style.color=st===s?'#fff':'#71717a';}});
+};
+window.saveJob=()=>{
+  const title=$('jf-t')?.value?.trim(),client=$('jf-c')?.value?.trim(),value=parseFloat($('jf-v')?.value)||0;
+  if(!title||!client){alert('Please enter a job title and client name');return;}
+  S.jobs.push({id:Date.now(),title,client,value,status:window._jobStage||'Lead',createdAt:new Date().toISOString()});
+  save('jobs');closeModal();renderApp();
+};
+window.delJob=id=>{S.jobs=S.jobs.filter(j=>j.id!==id);save('jobs');renderApp();};
+window.upJob=(id,status)=>{S.jobs=S.jobs.map(j=>j.id===id?{...j,status}:j);save('jobs');renderApp();};
+
+// ─── VOICE ────────────────────────────────────────────────
+let voiceSR=null;
+const renderVoice=()=>{
+  const t=T(),bc=S.voiceQuote?'#16a34a':S.voiceRec?'#dc2626':t.a,bs=S.voiceQuote?'rgba(22,163,74,.5)':S.voiceRec?'rgba(220,38,38,.5)':t.c;
+  const m=Math.floor(S.voiceTimer/60),s=String(S.voiceTimer%60).padStart(2,'0');
+  return`<div style="height:100%;overflow-y:auto">
+    ${hdr('Voice to Quote','dashboard')}
+    <div style="font-size:13px;color:#71717a;padding:0 16px 16px">Speak your job — AI builds a professional quote instantly</div>
+    <div style="display:flex;flex-direction:column;align-items:center;padding:0 16px 16px">
+      <div style="position:relative;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+        ${S.voiceRec?`<div style="position:absolute;width:180px;height:180px;border-radius:50%;background:rgba(220,38,38,.08);animation:rip 1.5s ease-out infinite"></div><div style="position:absolute;width:150px;height:150px;border-radius:50%;background:rgba(220,38,38,.12);animation:rip 1.5s ease-out .4s infinite"></div>`:''}
+        <button onclick="toggleVoice()" style="width:128px;height:128px;border-radius:50%;background:${bc};border:none;display:flex;align-items:center;justify-content:center;position:relative;z-index:1;box-shadow:0 0 40px ${bs};cursor:pointer">${ic(S.voiceQuote?'check':'mic',48,'#fff')}</button>
+      </div>
+      <div style="font-size:15px;font-weight:700;color:#fff">${S.voiceRec?`Recording... ${m}:${s}`:S.voiceText?'Ready to generate':'Tap to speak'}</div>
+      <div style="display:flex;align-items:center;gap:2px;margin-top:12px;height:36px">${Array.from({length:32}).map((_,i)=>`<div style="width:3px;border-radius:3px;background:${t.d};height:${S.voiceRec?(Math.abs(Math.sin(i*.5))*16+4)+'px':'4px'};opacity:${S.voiceRec?1:.2}"></div>`).join('')}</div>
+      ${S.voiceText?`<div style="margin-top:12px;width:100%;padding:12px 14px;background:#27272a;border:1px solid #3f3f46;border-radius:12px;font-size:13px;color:#a1a1aa;font-style:italic;line-height:1.5">"${esc(S.voiceText)}"</div>`:''}
+      ${S.voiceText&&!S.voiceQuote?`<div style="display:flex;gap:10px;margin-top:14px;width:100%"><button onclick="S.voiceText='';S.voiceQuote=null;renderApp()" style="flex:1;padding:12px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:13px">Re-record</button><button id="gq-btn" onclick="genQuote()" style="flex:2;padding:12px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700">✨ Generate Quote</button></div>`:''}
+      ${S.voiceQuote?`<div style="width:100%;margin-top:14px">${card(`<div style="padding:16px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">${logo(36)}<div><div style="font-size:14px;font-weight:700;color:#fff">Quote Preview</div><div style="font-size:12px;color:#71717a">${esc(S.voiceQuote.client||'')}</div></div></div>${(S.voiceQuote.items||[]).map(item=>`<div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px"><span style="color:#d4d4d8;flex:1">${esc(item.description||'')}</span><span style="color:${t.d};font-weight:700;margin-left:8px">${money(item.total||0,true)}</span></div>`).join('')}<div style="border-bottom:1px solid #27272a;margin:10px 0"></div><div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;color:${t.d};margin-top:8px"><span>Total</span><span>${money(S.voiceQuote.total||0,true)}</span></div></div>`)}<div style="display:flex;gap:10px;margin-top:10px"><button onclick="S.voiceQuote=null;S.voiceText='';renderApp()" style="flex:1;padding:12px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:13px">Redo</button><button onclick="saveQuote()" style="flex:2;padding:12px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700">Save to Jobs ✓</button></div></div>`:''}
+    </div>
+  </div>`;
+};
+window.toggleVoice=()=>{
+  if(S.voiceRec){S.voiceRec=false;clearInterval(S.voiceInterval);try{if(voiceSR)voiceSR.stop();}catch{}renderApp();return;}
+  S.voiceRec=true;S.voiceText='';S.voiceQuote=null;S.voiceTimer=0;
+  speak("Go for it — tell me about the job.");
+  S.voiceInterval=setInterval(()=>{S.voiceTimer++;renderApp();},1000);
+  if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    voiceSR=new SR();voiceSR.continuous=false;voiceSR.interimResults=true;voiceSR.lang='en-NZ';
+    voiceSR.onresult=e=>{S.voiceText=Array.from(e.results).map(r=>r[0].transcript).join(' ');renderApp();};
+    voiceSR.onend=()=>{S.voiceRec=false;clearInterval(S.voiceInterval);renderApp();};
+    voiceSR.onerror=()=>{S.voiceRec=false;clearInterval(S.voiceInterval);renderApp();};
+    voiceSR.start();
+  }else{setTimeout(()=>{S.voiceRec=false;clearInterval(S.voiceInterval);renderApp();},10000);}
+  renderApp();
+};
+window.genQuote=async()=>{
+  const btn=$('gq-btn');if(btn){btn.innerHTML=spin+' Generating...';btn.disabled=true;}
+  try{
+    const res=await fetch(`${API}/api/quote`,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},mode:'cors',body:JSON.stringify({transcript:S.voiceText,materials:S.materials,profile:S.profile,gst:S.gst*100,country:S.country})});
+    if(!res.ok)throw new Error(res.status);
+    const data=await res.json();S.voiceQuote=data.quote;
+    speak(`Your quote is ready. Total ${money(S.voiceQuote.total||0)}.`);
+  }catch{
+    S.voiceQuote={client:S.profile.name||'Client',items:[{description:S.voiceText,qty:1,unit_price:0,total:0}],subtotal:0,gst_rate:S.gst*100,gst_amount:0,total:0};
+    speak("Quote created. Check the pricing details.");
+  }
+  renderApp();
+};
+window.saveQuote=()=>{
+  if(!S.voiceQuote)return;
+  const seq=DB.get('qSeq',1);DB.set('qSeq',seq+1);
+  S.jobs.push({id:Date.now(),title:S.voiceQuote.items?.[0]?.description||'New Quote',client:S.voiceQuote.client||'Client',status:'Lead',value:S.voiceQuote.total||0,qNum:`#Q-${String(seq).padStart(4,'0')}`,createdAt:new Date().toISOString()});
+  save('jobs');S.voiceText='';S.voiceQuote=null;speak("Quote saved to Jobs.");go('jobs');
+};
+
+// ─── INVOICES ─────────────────────────────────────────────
+const renderInvoices=()=>{
+  const t=T(),list=S.invFilter==='All'?S.invoices:S.invoices.filter(i=>i.status===S.invFilter);
+  const out=S.invoices.filter(i=>i.status!=='Paid').reduce((a,i)=>a+(i.amount||0),0);
+  return`<div style="height:100%;overflow-y:auto">
+    ${hdr('Invoices','',plusBtn("openInvForm()"))}
+    <div style="margin:0 16px;border-radius:18px;padding:20px;background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(127,29,29,.2));border:1px solid rgba(239,68,68,.3)">
+      <div style="font-size:11px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:.08em">Outstanding Balance</div>
+      <div style="font-size:32px;font-weight:900;color:#fff;margin-top:4px">${money(out)}</div>
+      <div style="display:flex;gap:20px;margin-top:8px">
+        <div><span style="color:#f87171;font-weight:900">${S.invoices.filter(i=>i.status==='Overdue').length}</span><span style="color:#52525b;font-size:12px;margin-left:4px">Overdue</span></div>
+        <div><span style="color:#fbbf24;font-weight:900">${S.invoices.filter(i=>i.status==='Due Soon').length}</span><span style="color:#52525b;font-size:12px;margin-left:4px">Due Soon</span></div>
+        <div><span style="color:#4ade80;font-weight:900">${S.invoices.filter(i=>i.status==='Paid').length}</span><span style="color:#52525b;font-size:12px;margin-left:4px">Paid</span></div>
+      </div>
+    </div>
+    ${pills(['All','Overdue','Due Soon','Sent','Paid'],S.invFilter,`f=>{S.invFilter=f`)}
+    ${card(list.length===0?empty('doc','No invoices yet','Add your first invoice with the + button'):list.map((inv,i)=>`<div style="padding:14px;${i<list.length-1?'border-bottom:1px solid #27272a':''}"><div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="flex:1;min-width:0;margin-right:8px"><div style="font-size:11px;color:#52525b">${esc(inv.ref||'')}</div><div style="font-size:13px;font-weight:600;color:#fff;margin-top:1px">${esc(inv.client)}</div>${inv.due?`<div style="font-size:11px;color:#71717a">Due ${esc(inv.due)}</div>`:''}</div><div style="text-align:right"><div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">${money(inv.amount)}</div>${badge(inv.status)}</div></div><div style="display:flex;gap:6px;margin-top:8px">${inv.status!=='Paid'?`<button onclick="upInv(${inv.id},'Paid')" style="font-size:11px;padding:4px 10px;border-radius:8px;background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.3);cursor:pointer">Mark Paid</button>`:''}<button onclick="delInv(${inv.id})" style="background:none;border:none;padding:4px;margin-left:auto;cursor:pointer">${ic('trash',13,'#52525b')}</button></div></div>`).join(''),'margin:0 16px 16px')}
+  </div>`;
+};
+window.openInvForm=()=>{
+  const t=T();
+  showModal(`<div class="modal-handle"></div><div style="padding:0 20px 20px">
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:16px">+ New Invoice</div>
+    <label class="lbl">Client Name</label><input class="inp" id="if-cl" type="text" placeholder="Client name" autocomplete="off">
+    <label class="lbl">Amount ($)</label><input class="inp" id="if-am" type="number" inputmode="decimal" placeholder="0.00">
+    <label class="lbl">Due Date</label><input class="inp" id="if-du" type="date">
+    <label class="lbl" style="margin-bottom:8px">Status</label>
+    <div style="display:flex;gap:6px;margin-bottom:16px">
+      ${['Sent','Due Soon','Overdue'].map((s,i)=>`<button onclick="selectInvStatus('${s}')" id="is-${i}" style="flex:1;padding:8px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:${i===0?t.a:'#27272a'};color:${i===0?'#fff':'#71717a'}">${s}</button>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal()" style="flex:1;padding:13px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:14px">Cancel</button>
+      <button onclick="saveInv()" style="flex:1;padding:13px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700">Add Invoice</button>
+    </div>
+  </div>`);
+  window._invStatus='Sent';
+};
+window.selectInvStatus=s=>{
+  window._invStatus=s;const t=T();
+  ['Sent','Due Soon','Overdue'].forEach((st,i)=>{const b=$(`is-${i}`);if(b){b.style.background=st===s?t.a:'#27272a';b.style.color=st===s?'#fff':'#71717a';}});
+};
+window.saveInv=()=>{
+  const cl=$('if-cl')?.value?.trim(),am=parseFloat($('if-am')?.value)||0,du=$('if-du')?.value||'';
+  if(!cl||!am){alert('Please enter client name and amount');return;}
+  S.invoices.push({id:Date.now(),ref:`INV-${String(S.invoices.length+1).padStart(4,'0')}`,client:cl,amount:am,due:du,status:window._invStatus||'Sent',createdAt:new Date().toISOString()});
+  save('invoices');closeModal();renderApp();
+};
+window.upInv=(id,s)=>{S.invoices=S.invoices.map(i=>i.id===id?{...i,status:s}:i);save('invoices');renderApp();};
+window.delInv=id=>{S.invoices=S.invoices.filter(i=>i.id!==id);save('invoices');renderApp();};
+
+// ─── SAFETY ───────────────────────────────────────────────
+const CZONES={'New Zealand':{code:'HSWA 2015',contacts:[{t:'Emergency Services',n:'111',c:'#f87171'},{t:'WorkSafe NZ',n:'0800 030 040',c:'#fbbf24'},{t:'Poison Control',n:'0800 764 766',c:'#c084fc'}]},'Australia':{code:'WHS Act 2011',contacts:[{t:'Emergency Services',n:'000',c:'#f87171'},{t:'Safe Work',n:'1300 366 979',c:'#fbbf24'},{t:'Poisons',n:'13 11 26',c:'#c084fc'}]},'United Kingdom':{code:'HSWA 1974',contacts:[{t:'Emergency',n:'999',c:'#f87171'},{t:'HSE',n:'0345 300 9923',c:'#fbbf24'},{t:'NHS',n:'111',c:'#c084fc'}]},'United States':{code:'OSHA CFR 29',contacts:[{t:'Emergency',n:'911',c:'#f87171'},{t:'OSHA',n:'1-800-321-6742',c:'#fbbf24'},{t:'Poison',n:'1-800-222-1222',c:'#c084fc'}]}};
+const PPE=['Safety Harness & Lanyard','Hard Hat — AS/NZS 1801','Steel-Capped Boots','Hi-Vis Vest','Safety Glasses','Cut-Resistant Gloves','Hearing Protection'];
+const renderSafety=()=>{
+  const t=T(),cd=CZONES[S.country]||CZONES['New Zealand'];
+  return`<div style="height:100%;overflow-y:auto">
+    ${hdr('Safety Pack','dashboard')}
+    <div style="display:flex;align-items:center;gap:8px;padding:0 16px 10px;font-size:12px;color:#71717a">🇳🇿 ${esc(cd.code)} · <select onchange="S.country=this.value;save('country');renderApp()" style="background:#27272a;border:1px solid #3f3f46;border-radius:8px;padding:4px 8px;color:#d4d4d8;font-size:11px;cursor:pointer">${Object.keys(CZONES).map(c=>`<option ${S.country===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    ${pills(['Hazards','Toolbox','Emergency','PPE','Sign Off'],S.safetyTab,`t=>{S.safetyTab=t`)}
+    <div style="padding:8px 16px 16px;display:flex;flex-direction:column;gap:10px">
+      ${S.safetyTab==='Hazards'?`
+        <input type="file" id="sp-inp" accept="image/*" capture="environment" onchange="addSPhoto(event)" style="display:none">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${S.safetyPhotos.map(p=>`<div style="aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid #3f3f46"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}<button onclick="$('sp-inp').click()" style="aspect-ratio:1;border-radius:12px;border:2px dashed #3f3f46;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:#52525b;font-size:11px">${ic('cam',22,'#52525b')}<span>Add Photo</span></button></div>
+        ${S.safetyPhotos.length>0?`<button onclick="analyseSafety()" style="width:100%;padding:14px;border-radius:16px;background:${t.a};color:#fff;font-weight:700;font-size:14px;border:none;cursor:pointer">${S.safetyLoading?spin+' Analysing...':'🔍 Analyse for Hazards'}</button>`:''}
+        ${S.safetyHazards.length>0?S.safetyHazards.map(h=>card(`<div style="padding:16px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px"><div style="font-size:13px;font-weight:700;color:#fff;flex:1;margin-right:8px">${esc(h.name)}</div>${badge(h.severity||'Medium')}</div><div style="font-size:12px;color:#71717a;line-height:1.5">${esc(h.description||'')}</div><div style="font-size:12px;color:${t.d};margin-top:6px">→ ${esc(h.action||'')}</div></div>`)).join(''):S.safetyPhotos.length===0?empty('cam','Add site photos','Take photos of the site then tap Analyse to detect hazards with AI'):''}
+      `:''}
+      ${S.safetyTab==='Toolbox'?S.safetyToolbox?card(`<div style="padding:16px"><div style="font-size:11px;font-weight:700;color:${t.d};text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">AI Generated</div><div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:12px">${esc(S.safetyToolbox.title||'Site Safety Briefing')}</div>${[{h:'Work Plan',items:S.safetyToolbox.today_plan||[]},{h:'Key Hazards',items:S.safetyToolbox.key_hazards||[]},{h:'Emergency',items:S.safetyToolbox.emergency_procedures||[]}].map(s=>s.items.length?`<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:#52525b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">${s.h}</div>${s.items.map(item=>`<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px"><div style="width:6px;height:6px;border-radius:50%;background:${t.d};margin-top:5px;flex-shrink:0"></div><div style="font-size:13px;color:#d4d4d8;line-height:1.5">${esc(item)}</div></div>`).join('')}</div>`:'' ).join('')}</div>`):empty('shield','No toolbox talk yet','Add photos on the Hazards tab and run AI analysis first'):''}
+      ${S.safetyTab==='Emergency'?`<div style="padding:16px;border-radius:16px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3)"><div style="font-size:13px;font-weight:700;color:#f87171">🚨 Emergency Contacts — ${esc(S.country)}</div></div>${cd.contacts.map(c=>card(`<div style="padding:16px;display:flex;align-items:center;gap:12px"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#fff">${c.t}</div><div style="font-size:18px;font-weight:900;color:${c.c};margin-top:2px">${c.n}</div></div><button onclick="speak('Calling ${c.t}')" style="width:40px;height:40px;border-radius:12px;border:none;cursor:pointer;font-size:20px;background:${c.c}22">📞</button></div>`)).join('')}`:''}
+      ${S.safetyTab==='PPE'?card(PPE.map((p,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;${i<PPE.length-1?'border-bottom:1px solid #27272a':''}"><div style="width:20px;height:20px;border-radius:5px;background:${T().a};display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('check',12,'#fff')}</div><span style="font-size:13px;color:#e4e4e7">${p}</span></div>`).join(''),'overflow:hidden'):''}
+      ${S.safetyTab==='Sign Off'?`<button onclick="openWorkerForm()" style="padding:10px 16px;border-radius:12px;background:${t.b};border:1px solid ${t.c};color:${t.d};font-size:13px;cursor:pointer;font-weight:600">+ Add Worker</button>${S.workers.length===0?empty('user','No workers added','Tap + Add Worker to build the sign-off list'):card(S.workers.map((w,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:14px;${i<S.workers.length-1?'border-bottom:1px solid #27272a':''}"><div style="width:36px;height:36px;border-radius:50%;background:${t.b};display:flex;align-items:center;justify-content:center;font-weight:700;color:${t.d};font-size:13px;flex-shrink:0">${w.name.split(' ').map(x=>x[0]).join('')}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#fff">${esc(w.name)}</div><div style="font-size:11px;color:#71717a">${esc(w.role)}${w.signed?` · ✓ ${w.signedAt}`:''}</div></div><button onclick="signW(${w.id})" style="font-size:11px;font-weight:700;padding:6px 12px;border-radius:10px;cursor:pointer;border:1px solid;${w.signed?'border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.15);color:#4ade80':`border-color:transparent;background:${t.a};color:#fff`}">${w.signed?'✓ Signed':'Sign'}</button></div>`).join(''),'overflow:hidden')}`:''}
+    </div>
+  </div>`;
+};
+window.addSPhoto=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{S.safetyPhotos.push(ev.target.result);renderApp();};r.readAsDataURL(f);};
+window.analyseSafety=async()=>{
+  if(S.safetyLoading||!S.safetyPhotos.length)return;
+  S.safetyLoading=true;renderApp();
+  try{
+    const cd=CZONES[S.country]||CZONES['New Zealand'];
+    const res=await fetch(`${API}/api/safety`,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},mode:'cors',body:JSON.stringify({images:S.safetyPhotos.slice(0,4),country:S.country,legislation:cd.code})});
+    if(!res.ok)throw new Error(res.status);
+    const data=await res.json();
+    S.safetyHazards=data.safety?.hazards||[];S.safetyToolbox=data.safety?.toolbox||null;
+    speak(`Analysis done. ${S.safetyHazards.length} hazards found.`);
+  }catch(e){S.safetyHazards=[{name:'⚠️ Could not connect to AI',severity:'Medium',description:'Check your internet connection and try again.',action:'Ensure you are connected and tap Analyse again'}];}
+  S.safetyLoading=false;renderApp();
+};
+window.openWorkerForm=()=>{
+  const t=T();
+  showModal(`<div class="modal-handle"></div><div style="padding:0 20px 20px">
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:16px">+ Add Worker</div>
+    <label class="lbl">Full Name</label><input class="inp" id="wf-n" type="text" placeholder="e.g. Jake Mitchell" autocomplete="off">
+    <label class="lbl">Role</label><input class="inp" id="wf-r" type="text" placeholder="e.g. Roofer, Labourer" autocomplete="off">
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal()" style="flex:1;padding:13px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:14px">Cancel</button>
+      <button onclick="saveWorker()" style="flex:1;padding:13px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700">Add Worker</button>
+    </div>
+  </div>`);
+};
+window.saveWorker=()=>{
+  const n=$('wf-n')?.value?.trim(),r=$('wf-r')?.value?.trim()||'Worker';
+  if(!n){alert('Please enter a name');return;}
+  S.workers.push({id:Date.now(),name:n,role:r,signed:false});save('workers');closeModal();renderApp();
+};
+window.signW=id=>{S.workers=S.workers.map(w=>w.id===id?{...w,signed:true,signedAt:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}:w);save('workers');speak('Signature recorded.');renderApp();};
+
+// ─── SCANNER ──────────────────────────────────────────────
+const renderScanner=()=>`<div style="height:100%;overflow-y:auto">
+  ${hdr('AI Invoice Scanner','more')}
+  <div style="font-size:13px;color:#71717a;padding:0 16px 14px">Snap a supplier invoice — AI reads every price automatically</div>
+  <input type="file" id="sc-inp" accept="image/*" capture="environment" onchange="handleScan(event)" style="display:none">
+  <button onclick="$('sc-inp').click()" style="margin:0 16px;border-radius:16px;border:2px dashed #3f3f46;height:176px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:transparent;cursor:pointer;width:calc(100% - 32px)">
+    ${S.scanLoading?`${spin}<span style="font-size:13px;color:#71717a;margin-top:8px">Scanning with AI...</span>`:S.scanDone?`<div style="width:48px;height:48px;border-radius:16px;background:rgba(34,197,94,.2);display:flex;align-items:center;justify-content:center">${ic('check',24,'#4ade80')}</div><span style="font-size:13px;font-weight:600;color:#4ade80">Scanned — tap to scan another</span>`:`${ic('cam',32,'#52525b')}<span style="font-size:13px;font-weight:500;color:#71717a">Tap to scan invoice</span><span style="font-size:11px;color:#3f3f46">Camera or photo gallery</span>`}
+  </button>
+  ${S.scanDone&&S.scanItems.length>0?`${st('Extracted — '+esc(S.scanSupplier))}${card(S.scanItems.map((item,i)=>`<div style="display:flex;align-items:center;padding:12px 14px;gap:10px;${i<S.scanItems.length-1?'border-bottom:1px solid #27272a':''}"><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.name||'')}</div><div style="font-size:11px;color:#71717a;margin-top:1px">${esc(item.unit||'')}</div></div><div style="font-size:13px;font-weight:700;color:#fff">${money(item.price||0,true)}</div></div>`).join(''),'margin:0 16px;overflow:hidden')}<div style="padding:12px 16px 16px">${pbtn('Add All to Materials Database','addScanned()')}</div>`:''}
+  ${S.scanDone&&S.scanItems.length===0?`<div style="margin:20px 16px">${empty('scan','No items found','Try a clearer photo of the invoice')}</div>`:''}
+</div>`;
+window.handleScan=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=async ev=>{
+    S.scanLoading=true;S.scanDone=false;renderApp();
+    try{
+      const res=await fetch(`${API}/api/scan-invoice`,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},mode:'cors',body:JSON.stringify({image:ev.target.result})});
+      if(!res.ok)throw new Error(res.status);
+      const data=await res.json();S.scanItems=data.items||[];S.scanSupplier=data.supplier||'Supplier';S.scanDone=true;
+      speak(`Scanned. ${S.scanItems.length} items found.`);
+    }catch(e){S.scanItems=[];S.scanDone=true;}
+    S.scanLoading=false;renderApp();
+  };
+  r.readAsDataURL(f);
+};
+window.addScanned=()=>{
+  S.scanItems.forEach(item=>S.materials.push({id:Date.now()+Math.random(),name:item.name,price:item.price||0,unit:item.unit||'each',supplier:S.scanSupplier,updated:new Date().toLocaleDateString('en-NZ')}));
+  save('materials');speak('Prices added to materials database.');go('materials');
+};
+
+// ─── MILEAGE ──────────────────────────────────────────────
+const distKm=(la1,lo1,la2,lo2)=>{const R=6371,dLa=(la2-la1)*Math.PI/180,dLo=(lo2-lo1)*Math.PI/180,a=Math.sin(dLa/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));};
+const renderMileage=()=>{
+  const t=T(),tot=S.trips.reduce((a,tr)=>a+tr.km,0);
+  return`<div style="height:100%;overflow-y:auto">
+    ${hdr('Mileage & GPS','dashboard',`<button onclick="exportMileage()" style="font-size:11px;color:${t.d};font-weight:700;padding:6px 10px;border-radius:10px;background:${t.b};border:1px solid ${t.c};cursor:pointer">${ic('exp',13,t.d)} Export</button>`)}
+    ${card(`<div style="padding:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:#71717a">${S.activeTrip?`To: ${esc(S.activeTrip.dest)}`:'No trip active'}</span>${S.activeTrip?`<div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:50%;background:#4ade80;animation:dp .8s ease-in-out infinite"></div><span style="font-size:11px;color:#4ade80">GPS Active</span></div>`:''}</div><div style="font-size:44px;font-weight:900;color:#fff;letter-spacing:-1px">${S.tripKm.toFixed(1)} <span style="font-size:16px;color:#71717a;font-weight:400">km</span></div>${S.activeTrip?`<div style="font-size:12px;color:#71717a;margin-top:4px">Fuel: $${(S.tripKm*MRATE).toFixed(2)}</div>`:''}<div style="display:flex;gap:10px;margin-top:12px">${!S.activeTrip?pbtn('🚗 Start Trip','openTripForm()'):`<button onclick="endTrip()" style="flex:1;padding:13px;border-radius:14px;background:rgba(239,68,68,.9);color:#fff;font-weight:700;font-size:14px;border:none;cursor:pointer">⏹ End & Log</button>`}</div></div>`,'margin:0 16px;overflow:hidden')}
+    <div style="display:flex;gap:10px;margin:12px 16px 0">${[{l:'Total km',v:tot.toFixed(1),c:'#fbbf24'},{l:'Trips',v:S.trips.length,c:t.d},{l:'IRD claim',v:'$'+Math.round(tot*MRATE),c:'#4ade80'}].map(s=>`<div style="flex:1;background:#18181b;border:1px solid #27272a;border-radius:12px;padding:12px"><div style="font-size:18px;font-weight:900;color:${s.c}">${s.v}</div><div style="font-size:11px;color:#71717a;margin-top:2px">${s.l}</div></div>`).join('')}</div>
+    ${st('Trip Log')}
+    ${card(S.trips.length===0?empty('car','No trips logged','Tap Start Trip before driving to a job'):S.trips.slice().reverse().map((tr,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:14px;${i<S.trips.length-1?'border-bottom:1px solid #27272a':''}"><div style="width:36px;height:36px;border-radius:10px;background:rgba(245,158,11,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('car',16,'#fbbf24')}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#fff">${esc(tr.dest)}</div><div style="font-size:11px;color:#71717a">${dateStr(tr.date)} · ${tr.km.toFixed(1)} km</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:700;color:#fff">${tr.km.toFixed(1)} km</div><div style="font-size:11px;color:#71717a">$${tr.cost.toFixed(2)}</div></div><button onclick="delTrip(${tr.id})" style="background:none;border:none;padding:4px;cursor:pointer">${ic('trash',14,'#52525b')}</button></div>`).join(''),'margin:0 16px 16px;overflow:hidden')}
+  </div>`;
+};
+window.openTripForm=()=>{
+  const t=T();
+  showModal(`<div class="modal-handle"></div><div style="padding:0 20px 20px">
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:16px">🚗 Start Trip</div>
+    <label class="lbl">Destination / Job Name</label><input class="inp" id="tf-dest" type="text" placeholder="e.g. Cobden Site" autocomplete="off">
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal()" style="flex:1;padding:13px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:14px">Cancel</button>
+      <button onclick="startTrip()" style="flex:1;padding:13px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700">Start GPS</button>
+    </div>
+  </div>`);
+};
+window.startTrip=()=>{
+  const dest=$('tf-dest')?.value?.trim()||'Work Trip';
+  closeModal();
+  S.activeTrip={dest,start:Date.now()};S.tripKm=0;
+  if(navigator.geolocation){
+    let last=null;
+    S.gpsWatch=navigator.geolocation.watchPosition(pos=>{
+      if(last){const d=distKm(last.coords.latitude,last.coords.longitude,pos.coords.latitude,pos.coords.longitude);S.tripKm=parseFloat((S.tripKm+d).toFixed(2));renderApp();}
+      last=pos;
+    },err=>{alert('GPS error: '+err.message);},{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+  }else{alert('GPS not available on this device.');}
+  speak('Trip started. GPS tracking.');renderApp();
+};
+window.endTrip=()=>{
+  if(S.gpsWatch&&navigator.geolocation)navigator.geolocation.clearWatch(S.gpsWatch);S.gpsWatch=null;
+  if(S.tripKm<0.1){speak('Trip too short to log.');S.activeTrip=null;S.tripKm=0;renderApp();return;}
+  S.trips.push({id:Date.now(),dest:S.activeTrip.dest,km:S.tripKm,date:new Date().toISOString(),cost:parseFloat((S.tripKm*MRATE).toFixed(2))});
+  save('trips');speak(`Trip logged. ${S.tripKm.toFixed(1)} kilometres.`);S.activeTrip=null;S.tripKm=0;renderApp();
+};
+window.delTrip=id=>{S.trips=S.trips.filter(t=>t.id!==id);save('trips');renderApp();};
+window.exportMileage=()=>{
+  if(!S.trips.length){speak('No trips to export yet.');return;}
+  const rows=[['Date','Destination','km','Cost ($)']];
+  S.trips.forEach(t=>rows.push([new Date(t.date).toLocaleDateString('en-NZ'),t.dest,t.km.toFixed(2),t.cost.toFixed(2)]));
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n'));a.download='mileage-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+};
+
+// ─── EMAIL ────────────────────────────────────────────────
+const renderEmail=()=>{
+  const t=T();
+  return`<div style="height:100%;overflow-y:auto">
+    ${hdr('AI Email Assistant','dashboard')}
+    <div style="padding:0 16px 16px">
+      <div style="font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Incoming Email — paste it here</div>
+      <textarea id="em-in" rows="5" placeholder="Paste the email you received..." style="width:100%;background:#27272a;border:1px solid #3f3f46;border-radius:12px;padding:12px 14px;font-size:14px;color:#fff;outline:none;resize:none;margin-bottom:12px;display:block"></textarea>
+      <div style="font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">What do you want to say?</div>
+      <textarea id="em-re" rows="3" placeholder='e.g. "Thursday works, will include the pergola, happy to discuss price"' style="width:100%;background:#27272a;border:1px solid #3f3f46;border-radius:12px;padding:12px 14px;font-size:14px;color:#fff;outline:none;resize:none;margin-bottom:12px;display:block"></textarea>
+      <button id="em-btn" onclick="genEmail()" style="width:100%;padding:14px;border-radius:16px;background:${t.a};color:#fff;font-weight:700;font-size:14px;border:none;cursor:pointer;box-shadow:0 4px 16px ${t.c}">✨ Write AI Reply</button>
+      <div id="em-result"></div>
+    </div>
+  </div>`;
+};
+window.genEmail=async()=>{
+  const emailIn=$('em-in')?.value?.trim();
+  const emailReply=$('em-re')?.value?.trim();
+  if(!emailIn&&!emailReply){alert('Please paste an email or describe what you want to say');return;}
+  const btn=$('em-btn');if(btn){btn.innerHTML=spin+' Writing...';btn.disabled=true;}
+  try{
+    const res=await fetch(`${API}/api/email`,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},mode:'cors',body:JSON.stringify({incomingEmail:emailIn,replyIntent:emailReply,senderName:S.profile.name||'',companyName:S.profile.company||'',style:S.voice.style||'professional'})});
+    if(!res.ok)throw new Error(res.status);
+    const data=await res.json();
+    const draft=data.draft||'No reply generated';
+    const t=T();
+    const el=$('em-result');
+    if(el)el.innerHTML=`<div style="margin-top:16px;animation:fi .3s ease"><div style="font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">AI Draft Reply</div><div style="padding:14px;background:#27272a;border:1px solid #3f3f46;border-radius:12px;font-size:13px;color:#d4d4d8;line-height:1.7;white-space:pre-wrap">${esc(draft)}</div><div style="display:flex;gap:8px;margin-top:10px"><button onclick="$('em-result').innerHTML=''" style="flex:1;padding:12px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:13px">Discard</button><button onclick="this.textContent='✓ Sent';this.style.background='#16a34a';speak('Reply sent.')" style="flex:2;padding:12px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:700">Send Reply</button></div></div>`;
+  }catch(e){
+    const el=$('em-result');
+    const fallback=`Hi,\n\nThank you for getting in touch.\n\n${emailReply||''}\n\nCheers,\n${S.profile.name||'Your Name'}${S.profile.company?'\n'+S.profile.company:''}`;
+    const t=T();
+    if(el)el.innerHTML=`<div style="margin-top:16px"><div style="font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Draft Reply</div><div style="padding:14px;background:#27272a;border:1px solid #3f3f46;border-radius:12px;font-size:13px;color:#d4d4d8;line-height:1.7;white-space:pre-wrap">${esc(fallback)}</div></div>`;
+  }
+  if(btn){btn.innerHTML='✨ Write AI Reply';btn.disabled=false;}
+};
+
+// ─── MATERIALS ────────────────────────────────────────────
+const renderMaterials=()=>{
+  const t=T(),filt=S.materials.filter(m=>(m.name||'').toLowerCase().includes(S.matSearch.toLowerCase())||(m.supplier||'').toLowerCase().includes(S.matSearch.toLowerCase()));
+  return`<div style="height:100%;overflow-y:auto">
+    ${hdr('Materials Database','more',`<div style="display:flex;gap:6px"><button onclick="go('scanner')" style="font-size:11px;color:${t.d};font-weight:700;padding:6px 10px;border-radius:10px;background:${t.b};border:1px solid ${t.c};cursor:pointer">Scan Invoice</button>${plusBtn("openMatForm()")}</div>`)}
+    <div style="margin:0 16px 10px;display:flex;align-items:center;gap:8px;background:#27272a;border:1px solid #3f3f46;border-radius:12px;padding:8px 12px">${ic('more',14,'#52525b')}<input type="text" id="mat-search" value="${esc(S.matSearch)}" oninput="S.matSearch=this.value;renderApp()" placeholder="Search materials..." style="flex:1;background:transparent;border:none;outline:none;font-size:13px;color:#fff"></div>
+    ${card(filt.length===0?empty('more','No materials yet','Add manually or scan a supplier invoice',`<button onclick="go('scanner')" style="background:${t.a};color:#fff;padding:8px 16px;border-radius:10px;font-size:12px;border:none;cursor:pointer;margin-top:4px">Scan Invoice</button>`):filt.map((m,i)=>`<div style="display:flex;align-items:center;padding:12px 14px;gap:10px;${i<filt.length-1?'border-bottom:1px solid #27272a':''}"><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.name)}</div><div style="font-size:11px;color:#71717a;margin-top:1px">${esc(m.supplier||'—')} · ${esc(m.unit||'each')}</div></div><div style="font-size:14px;font-weight:700;color:#fff">${money(m.price||0,true)}</div><button onclick="delMat(${m.id})" style="background:none;border:none;padding:4px;cursor:pointer">${ic('trash',14,'#52525b')}</button></div>`).join(''),'margin:0 16px 16px;overflow:hidden')}
+  </div>`;
+};
+window.openMatForm=()=>{
+  const t=T();
+  showModal(`<div class="modal-handle"></div><div style="padding:0 20px 20px">
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:16px">+ Add Material</div>
+    <label class="lbl">Material Name</label><input class="inp" id="mf-n" type="text" placeholder="e.g. Colorbond Steel Sheet" autocomplete="off">
+    <label class="lbl">Price ($)</label><input class="inp" id="mf-p" type="number" inputmode="decimal" step="0.01" placeholder="0.00">
+    <label class="lbl">Unit</label><input class="inp" id="mf-u" type="text" placeholder="per sheet, per m, each..." autocomplete="off">
+    <label class="lbl">Supplier</label><input class="inp" id="mf-s" type="text" placeholder="Supplier name" autocomplete="off">
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal()" style="flex:1;padding:13px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:14px">Cancel</button>
+      <button onclick="saveMat()" style="flex:1;padding:13px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700">Add</button>
+    </div>
+  </div>`);
+};
+window.saveMat=()=>{
+  const n=$('mf-n')?.value?.trim(),p=parseFloat($('mf-p')?.value)||0,u=$('mf-u')?.value?.trim()||'each',s=$('mf-s')?.value?.trim()||'';
+  if(!n){alert('Please enter a material name');return;}
+  S.materials.push({id:Date.now(),name:n,price:p,unit:u,supplier:s,updated:new Date().toLocaleDateString('en-NZ')});
+  save('materials');closeModal();renderApp();
+};
+window.delMat=id=>{S.materials=S.materials.filter(m=>m.id!==id);save('materials');renderApp();};
+
+// ─── RECEIPTS ─────────────────────────────────────────────
+const CATCOLS={Materials:'#60a5fa',Fuel:'#fbbf24',Tools:'#f87171',Subcontractors:'#a78bfa',Insurance:'#4ade80',Vehicle:'#fb923c',Office:'#22d3ee',Food:'#f472b6',Other:'#a1a1aa'};
+const CATS=Object.keys(CATCOLS);
+const guessCat=(sup,items=[])=>{const s=(sup+' '+items.map(i=>i.name||'').join(' ')).toLowerCase();if(/steel|iron|colorbond|timber|plywood|concrete|gib|pipe/.test(s))return'Materials';if(/fuel|petrol|diesel|bp|z energy|mobil/.test(s))return'Fuel';if(/tool|makita|dewalt|hilti|hardware/.test(s))return'Tools';if(/insurance/.test(s))return'Insurance';if(/vehicle|tyre|warrant|wof|service/.test(s))return'Vehicle';if(/cafe|coffee|food|restaurant|countdown|pak/.test(s))return'Food';return'Other';};
+const renderReceipts=()=>{
+  const t=T(),ms=new Date(new Date().getFullYear(),new Date().getMonth(),1),mth=S.receipts.filter(r=>new Date(r.date)>=ms),mthTot=mth.reduce((a,r)=>a+(r.amount||0),0);
+  const byCat=CATS.map(c=>({c,v:mth.filter(r=>r.category===c).reduce((a,r)=>a+(r.amount||0),0)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  const usedCats=[...new Set(S.receipts.map(r=>r.category))].filter(Boolean);
+  const filt=S.receiptFilter==='All'?S.receipts:S.receipts.filter(r=>r.category===S.receiptFilter);
+  return`<div style="height:100%;overflow-y:auto">
+    ${hdr('Receipt Logger','more',`<div style="display:flex;gap:6px"><button onclick="exportReceipts()" style="font-size:11px;color:${t.d};font-weight:700;padding:6px 10px;border-radius:10px;background:${t.b};border:1px solid ${t.c};cursor:pointer">Export</button>${plusBtn("openReceiptForm()")}</div>`)}
+    <input type="file" id="rc-inp" accept="image/*" capture="environment" onchange="handleReceiptScan(event)" style="display:none">
+    <button onclick="$('rc-inp').click()" style="margin:0 16px 10px;border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px;background:${t.b};border:1px solid ${t.c};cursor:pointer;width:calc(100% - 32px)">
+      ${S.receiptLoading?`${spin}<div><div style="font-size:13px;font-weight:700;color:#fff">Scanning receipt...</div></div>`:
+      `<div style="width:44px;height:44px;border-radius:14px;background:${t.a};display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('cam',22,'#fff')}</div><div><div style="font-size:13px;font-weight:700;color:#fff">📸 Snap a Receipt</div><div style="font-size:11px;color:#71717a;margin-top:2px">AI reads & auto-categorises</div></div>`}
+    </button>
+    ${mthTot>0?`<div style="margin:0 16px 10px;border-radius:18px;padding:16px;background:linear-gradient(135deg,${t.a} 0%,${t.a}cc 100%)"><div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.08em">${new Date().toLocaleDateString('en-NZ',{month:'long',year:'numeric'})} Spending</div><div style="font-size:32px;font-weight:900;color:#fff;margin-top:4px">${money(mthTot)}</div><div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:2px">${mth.length} receipt${mth.length!==1?'s':''} this month</div>${byCat.slice(0,4).map(c=>`<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:rgba(255,255,255,.7);font-weight:600">${c.c}</span><span style="color:#fff;font-weight:700">$${Math.round(c.v)}</span></div><div style="height:4px;border-radius:2px;background:rgba(255,255,255,.15)"><div style="height:100%;border-radius:2px;background:${CATCOLS[c.c]||'#fff'};width:${Math.min((c.v/mthTot)*100,100)}%"></div></div></div>`).join('')}</div>`:''}
+    ${pills(['All',...usedCats],S.receiptFilter,`f=>{S.receiptFilter=f`)}
+    ${card(filt.length===0?empty('doc','No receipts yet','Snap a receipt or add one manually'):filt.slice().reverse().map((r,i,a)=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:14px;${i<a.length-1?'border-bottom:1px solid #27272a':''}"><div style="width:36px;height:36px;border-radius:10px;background:${(CATCOLS[r.category]||'#71717a')}22;display:flex;align-items:center;justify-content:center;flex-shrink:0"><div style="width:10px;height:10px;border-radius:50%;background:${CATCOLS[r.category]||'#71717a'}"></div></div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.supplier)}</div><div style="display:flex;align-items:center;gap:6px;margin-top:2px"><span style="font-size:11px;font-weight:600;padding:1px 6px;border-radius:6px;background:${(CATCOLS[r.category]||'#71717a')}25;color:${CATCOLS[r.category]||'#71717a'}">${esc(r.category)}</span>${r.aiScanned?`<span style="font-size:10px;color:${t.d}">✦ AI</span>`:''}</div>${r.note?`<div style="font-size:11px;color:#52525b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.note)}</div>`:''}<div style="font-size:11px;color:#3f3f46;margin-top:2px">${dateStr(r.date)}</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:900;color:#fff">${money(r.amount||0,true)}</div><button onclick="delReceipt(${r.id})" style="background:none;border:none;padding:4px;cursor:pointer;margin-top:2px">${ic('trash',13,'#52525b')}</button></div></div>`).join(''),'margin:0 16px 16px;overflow:hidden')}
+  </div>`;
+};
+window.handleReceiptScan=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=async ev=>{
+    S.receiptLoading=true;renderApp();
+    try{
+      const res=await fetch(`${API}/api/scan-invoice`,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},mode:'cors',body:JSON.stringify({image:ev.target.result})});
+      if(!res.ok)throw new Error();
+      const data=await res.json();
+      const tot=data.items?.reduce((a,i)=>a+(i.price||0),0)||0;
+      S.receipts.push({id:Date.now(),supplier:data.supplier||'Unknown',amount:tot,category:guessCat(data.supplier||'',data.items||[]),note:(data.items||[]).map(i=>i.name).join(', ').slice(0,80),date:new Date().toISOString(),aiScanned:true});
+      save('receipts');speak(`Receipt scanned. ${data.supplier||'Unknown'}, ${money(tot,true)}.`);
+    }catch{openReceiptForm();}
+    S.receiptLoading=false;renderApp();
+  };
+  r.readAsDataURL(f);
+};
+window.openReceiptForm=()=>{
+  const t=T();window._rcat='Other';
+  showModal(`<div class="modal-handle"></div><div style="padding:0 20px 20px">
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:16px">+ Add Receipt</div>
+    <label class="lbl">Supplier / Store</label><input class="inp" id="rf-su" type="text" placeholder="e.g. Bunnings, BP, Steel & Tube" autocomplete="off">
+    <label class="lbl">Amount ($)</label><input class="inp" id="rf-am" type="number" inputmode="decimal" step="0.01" placeholder="0.00">
+    <label class="lbl" style="margin-bottom:8px">Category</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${CATS.map(c=>`<button onclick="window._rcat='${c}';document.querySelectorAll('.rcat-btn').forEach(b=>{b.style.background='#27272a';b.style.color='#71717a'});this.style.background='${CATCOLS[c]}33';this.style.color='${CATCOLS[c]}'" class="rcat-btn" style="font-size:11px;padding:6px 10px;border-radius:8px;background:#27272a;color:#71717a;border:1px solid #3f3f46;cursor:pointer">${c}</button>`).join('')}</div>
+    <label class="lbl">Note (optional)</label><input class="inp" id="rf-no" type="text" placeholder="What was it for?" autocomplete="off">
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal()" style="flex:1;padding:13px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:14px">Cancel</button>
+      <button onclick="saveReceipt()" style="flex:1;padding:13px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700">Add</button>
+    </div>
+  </div>`);
+};
+window.saveReceipt=()=>{
+  const su=$('rf-su')?.value?.trim(),am=parseFloat($('rf-am')?.value)||0,no=$('rf-no')?.value?.trim()||'';
+  if(!su||!am){alert('Please enter supplier and amount');return;}
+  S.receipts.push({id:Date.now(),supplier:su,amount:am,category:window._rcat||'Other',note:no,date:new Date().toISOString(),aiScanned:false});
+  save('receipts');closeModal();renderApp();
+};
+window.delReceipt=id=>{S.receipts=S.receipts.filter(r=>r.id!==id);save('receipts');renderApp();};
+window.exportReceipts=()=>{
+  if(!S.receipts.length){speak('No receipts to export.');return;}
+  const rows=[['Date','Supplier','Category','Amount ($)','Note','AI Scanned']];
+  S.receipts.forEach(r=>rows.push([new Date(r.date).toLocaleDateString('en-NZ'),r.supplier,r.category,(r.amount||0).toFixed(2),r.note||'',r.aiScanned?'Yes':'No']));
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n'));a.download='receipts-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+};
+window.setRF=f=>{S.receiptFilter=f;renderApp();};
+
+// ─── VOICE SETTINGS ───────────────────────────────────────
+const renderVoiceSettings=()=>{
+  const v=S.voice,t=T();
+  return`<div style="height:100%;overflow-y:auto">
+    ${hdr('AI Voice Settings','settings')}
+    ${card(`<div style="padding:16px;display:flex;align-items:center;gap:14px"><button onclick="speak('G\\'day, TradeFlow AI here. Ready to sort your quotes, mate.')" style="width:48px;height:48px;border-radius:16px;background:${t.a};border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">${ic('mic',22,'#fff')}</button><div style="flex:1"><div style="font-size:11px;color:#71717a;margin-bottom:6px">ElevenLabs Neural · Tap to preview</div><div style="display:flex;align-items:center;gap:2px;height:28px">${Array.from({length:28}).map((_,i)=>`<div style="width:3px;border-radius:3px;background:${t.d};height:${Math.abs(Math.sin(i*.5))*18+5}px;opacity:${.5+Math.abs(Math.sin(i*.3))*.5}"></div>`).join('')}</div></div></div>`,'margin:0 16px')}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 16px 0;background:#18181b;border:1px solid #27272a;border-radius:12px;padding:12px 16px"><span style="font-size:13px;font-weight:600;color:#fff">Voice Enabled</span>
+      <button onclick="S.voice.on=!S.voice.on;save('voice');renderApp()" style="width:48px;height:26px;border-radius:13px;background:${v.on?t.a:'#3f3f46'};border:none;cursor:pointer;position:relative;transition:background .2s"><div style="position:absolute;top:3px;left:${v.on?'25px':'3px'};width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div></button>
+    </div>
+    ${st('Accent')}
+    <div style="display:flex;gap:8px;padding:0 16px;flex-wrap:wrap">${[['🇳🇿','New Zealand','nz'],['🇦🇺','Australian','au'],['🇬🇧','British','gb'],['🇺🇸','American','us'],['🇮🇪','Irish','ie'],['🇿🇦','South African','za']].map(([f,n,id])=>`<button onclick="S.voice.accent='${id}';save('voice');renderApp()" style="padding:8px 12px;border-radius:12px;font-size:12px;font-weight:700;border:none;cursor:pointer;margin-bottom:6px;background:${v.accent===id?t.a:'#27272a'};color:${v.accent===id?'#fff':'#71717a'}">${f} ${n}</button>`).join('')}</div>
+    ${st('Voice')}
+    <div style="display:flex;gap:10px;padding:0 16px">${[['Male','m'],['Female','f']].map(([l,val])=>`<button onclick="S.voice.gender='${val}';save('voice');renderApp()" style="flex:1;padding:10px;border-radius:12px;font-size:13px;font-weight:700;border:none;cursor:pointer;background:${v.gender===val?t.a:'#27272a'};color:${v.gender===val?'#fff':'#71717a'}">${val==='m'?'👨 Male':'👩 Female'}</button>`).join('')}</div>
+    ${st('Style')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px">${[['Professional','professional'],['Friendly','friendly'],['Straight-up Tradie','tradie'],['Sales Focused','sales']].map(([l,val])=>`<button onclick="S.voice.style='${val}';save('voice');renderApp()" style="padding:10px 12px;border-radius:12px;font-size:12px;font-weight:700;text-align:left;cursor:pointer;background:${v.style===val?t.a:'#27272a'};color:${v.style===val?'#fff':'#71717a'};border:${v.style===val?`1px solid ${t.d}`:'1px solid #3f3f46'}">${l}</button>`).join('')}</div>
+    <div style="padding:16px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#71717a;margin-bottom:8px"><span>Speed</span><span id="spd-lbl" style="color:${t.d};font-weight:700">${v.speed.toFixed(1)}×</span></div><input type="range" min="5" max="20" value="${Math.round(v.speed*10)}" oninput="S.voice.speed=parseFloat((this.value/10).toFixed(1));save('voice');const l=$('spd-lbl');if(l)l.textContent=S.voice.speed.toFixed(1)+'×'"></div>
+    <div style="padding:0 16px 24px">${pbtn('🔊 Test Voice',"speak(\"G\\'day, TradeFlow AI here. Ready to sort your quotes, mate.\")")}</div>
+  </div>`;
+};
+
+// ─── SETTINGS ─────────────────────────────────────────────
+const TNAMES=['Light Blue','Sky Blue','Navy','Teal','Indigo','Slate'];
+const TDOTS={'Light Blue':'#60a5fa','Sky Blue':'#38bdf8','Navy':'#3b82f6','Teal':'#2dd4bf','Indigo':'#818cf8','Slate':'#94a3b8'};
+const renderSettings=()=>{
+  const t=T(),p=S.profile;
+  return`<div style="height:100%;overflow-y:auto">
+    <div style="margin:20px 16px 0;border-radius:20px;padding:20px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,${t.a} 0%,${t.a}cc 60%,${t.a}88 100%)">
+      <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0">${p.name?p.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase():'?'}</div>
+      <div style="flex:1"><div style="font-size:16px;font-weight:700;color:#fff">${esc(p.name||'Set up your profile')}</div><div style="font-size:13px;color:rgba(255,255,255,.75)">${esc(p.company||'Tap edit to get started')}</div><div style="margin-top:6px;display:inline-block;font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;background:rgba(255,255,255,.2);color:#fff">TradeFlow AI · Pro</div></div>
+      <button onclick="openProfileForm()" style="background:rgba(255,255,255,.15);border:none;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer">${ic('edit',15,'#fff')}</button>
+    </div>
+    ${st('Theme')}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 16px">${TNAMES.map(n=>`<button onclick="S.theme='${n}';save('theme');renderApp()" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;border-radius:14px;cursor:pointer;background:${S.theme===n?T().b:'#18181b'};border:${S.theme===n?`1px solid ${T().d}`:'1px solid #27272a'}"><div style="width:28px;height:28px;border-radius:50%;background:${TDOTS[n]}"></div><span style="font-size:11px;font-weight:700;color:${S.theme===n?T().d:'#71717a'}">${n}</span></button>`).join('')}</div>
+    ${st('Security')}
+    ${card(`
+      <button onclick="openPinForm()" style="display:flex;align-items:center;gap:10px;padding:14px;width:100%;background:transparent;border:none;border-bottom:1px solid #27272a;cursor:pointer"><div style="width:32px;height:32px;border-radius:9px;background:#27272a;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('lock',16,t.d)}</div><span style="flex:1;font-size:13px;font-weight:500;color:#e4e4e7;text-align:left">Change PIN</span>${ic('chev',14,'#52525b')}</button>
+      <button onclick="go('voicesettings')" style="display:flex;align-items:center;gap:10px;padding:14px;width:100%;background:transparent;border:none;border-bottom:1px solid #27272a;cursor:pointer"><div style="width:32px;height:32px;border-radius:9px;background:#27272a;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('mic',16,t.d)}</div><span style="flex:1;font-size:13px;font-weight:500;color:#e4e4e7;text-align:left">AI Voice Settings</span>${ic('chev',14,'#52525b')}</button>
+      <button onclick="clearAll()" style="display:flex;align-items:center;gap:10px;padding:14px;width:100%;background:transparent;border:none;cursor:pointer"><div style="width:32px;height:32px;border-radius:9px;background:rgba(239,68,68,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('trash',16,'#f87171')}</div><span style="flex:1;font-size:13px;font-weight:500;color:#f87171;text-align:left">Clear All Data</span></button>
+    `,'margin:0 16px;overflow:hidden')}
+    <div style="padding:16px;font-size:12px;color:#3f3f46;text-align:center;line-height:1.6">TradeFlow AI v1.0 · Built on the tools.</div>
+    <div style="padding:0 16px 24px"><button onclick="doLogout()" style="width:100%;padding:13px;border-radius:14px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#f87171;font-size:13px;font-weight:600;cursor:pointer">Log Out${S.isAdmin?' (Admin)':''}</button></div>
+  </div>`;
+};
+window.openProfileForm=()=>{
+  const t=T(),p=S.profile;
+  showModal(`<div class="modal-handle"></div><div style="padding:0 20px 20px">
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:16px">Edit Profile</div>
+    <label class="lbl">Your Name</label><input class="inp" id="pf-nm" type="text" value="${esc(p.name||'')}" placeholder="Alex Thompson" autocomplete="name">
+    <label class="lbl">Company Name</label><input class="inp" id="pf-co" type="text" value="${esc(p.company||'')}" placeholder="Thompson Roofing Ltd" autocomplete="organization">
+    <label class="lbl">Location</label><input class="inp" id="pf-lo" type="text" value="${esc(p.location||'')}" placeholder="Auckland, NZ" autocomplete="off">
+    <label class="lbl">Phone</label><input class="inp" id="pf-ph" type="tel" value="${esc(p.phone||'')}" placeholder="021 123 4567" autocomplete="tel">
+    <label class="lbl">GST Rate (%)</label><input class="inp" id="pf-gt" type="number" value="${S.gst*100}" placeholder="15">
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal()" style="flex:1;padding:13px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:14px">Cancel</button>
+      <button onclick="saveProfile()" style="flex:1;padding:13px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700">Save</button>
+    </div>
+  </div>`);
+};
+window.saveProfile=()=>{
+  S.profile.name=$('pf-nm')?.value?.trim()||S.profile.name;
+  S.profile.company=$('pf-co')?.value?.trim()||S.profile.company;
+  S.profile.location=$('pf-lo')?.value?.trim()||S.profile.location;
+  S.profile.phone=$('pf-ph')?.value?.trim()||S.profile.phone;
+  S.gst=parseFloat($('pf-gt')?.value)/100||S.gst;
+  save('profile');save('gst');closeModal();speak('Profile saved.');renderApp();
+};
+window.openPinForm=()=>{
+  const t=T();
+  showModal(`<div class="modal-handle"></div><div style="padding:0 20px 20px">
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:16px">Change PIN</div>
+    <label class="lbl">New PIN (4 digits)</label><input class="inp" id="np1" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="text-align:center;font-size:24px;letter-spacing:8px">
+    <label class="lbl">Confirm PIN</label><input class="inp" id="np2" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="text-align:center;font-size:24px;letter-spacing:8px">
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal()" style="flex:1;padding:13px;border-radius:14px;background:#27272a;color:#71717a;border:none;cursor:pointer;font-size:14px">Cancel</button>
+      <button onclick="savePin()" style="flex:1;padding:13px;border-radius:14px;background:${t.a};color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700">Save PIN</button>
+    </div>
+  </div>`);
+};
+window.savePin=()=>{
+  const p1=$('np1')?.value,p2=$('np2')?.value;
+  if(!/^\d{4}$/.test(p1)){alert('PIN must be exactly 4 digits');return;}
+  if(p1!==p2){alert('PINs do not match');return;}
+  S.pin=p1;DB.set('pin',p1);closeModal();speak('PIN updated.');renderApp();
+};
+window.clearAll=()=>{if(!confirm('Delete ALL data permanently? This cannot be undone.'))return;['jobs','invoices','trips','materials','receipts','profile','workers','voice','qSeq','theme','pin','country','gst','authUser','authToken','isAdmin','subStatus','trialStart'].forEach(k=>localStorage.removeItem('tf_'+k));location.reload();};
+window.doLogout=()=>{if(!confirm('Log out?'))return;['authUser','authToken','isAdmin','subStatus','trialStart'].forEach(k=>DB.set(k,null));S.authUser=null;S.authToken=null;S.isAdmin=false;S.subStatus=null;S.phase='auth';renderApp();};
+
+// ─── MORE ─────────────────────────────────────────────────
+const renderMore=()=>{
+  const t=T();
+  const items=[{l:'Receipt Logger',i:'scan',s:'receipts',c:'#fb923c',sub:'AI spending tracker'},{l:'Quotes / Jobs',i:'jobs',s:'jobs',c:t.d,sub:'Pipeline, quotes, variations'},{l:'AI Invoice Scanner',i:'scan',s:'scanner',c:'#22d3ee',sub:'Scan supplier invoices'},{l:'Safety Pack',i:'shield',s:'safety',c:'#f87171',sub:'Hazards, toolbox, PPE'},{l:'Mileage & GPS',i:'car',s:'mileage',c:'#fbbf24',sub:'Log trips, export for IRD'},{l:'Materials Database',i:'more',s:'materials',c:'#4ade80',sub:'Live prices, always accurate'},{l:'AI Email Assistant',i:'mail',s:'email',c:'#c084fc',sub:'Read, summarise and reply'},{l:'Voice Settings',i:'mic',s:'voicesettings',c:'#34d399',sub:'Accent, style, speed'},{l:'Settings',i:'cog',s:'settings',c:'#a1a1aa',sub:'Profile, theme, security'}];
+  return`<div style="height:100%;overflow-y:auto"><div style="padding:20px 16px 12px"><span style="font-size:20px;font-weight:800;color:#fff">More</span></div>${card(items.map((item,i)=>`<button onclick="go('${item.s}')" style="display:flex;align-items:center;gap:10px;padding:14px;width:100%;background:transparent;border:none;cursor:pointer;${i<items.length-1?'border-bottom:1px solid #27272a':''}"><div style="width:40px;height:40px;border-radius:12px;background:#27272a;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic(item.i,18,item.c)}</div><div style="flex:1;text-align:left"><div style="font-size:13px;font-weight:600;color:#e4e4e7">${item.l}</div><div style="font-size:11px;color:#71717a;margin-top:1px">${item.sub}</div></div>${ic('chev',14,'#52525b')}</button>`).join(''),'margin:0 16px 16px;overflow:hidden')}</div>`;
+};
+
+// ─── ROUTER ───────────────────────────────────────────────
+const SCREENS={dashboard:renderDash,jobs:renderJobs,voice:renderVoice,invoices:renderInvoices,email:renderEmail,scanner:renderScanner,safety:renderSafety,mileage:renderMileage,materials:renderMaterials,voicesettings:renderVoiceSettings,settings:renderSettings,more:renderMore,receipts:renderReceipts};
+const MAIN=['dashboard','jobs','invoices'];
+
+// ─── RENDER APP ───────────────────────────────────────────
+const renderApp=()=>{
+  const root=$('root');if(!root)return;
+  const t=T();
+
+  if(S.phase==='splash'){
+    root.innerHTML=`<div style="width:min(390px,100vw);height:min(844px,100vh);background:#fff;border-radius:clamp(0px,3vw,28px);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 30px 80px rgba(0,0,0,.9)">
+      <div style="animation:sup .7s ease forwards;opacity:0">${logo(92)}</div>
+      <div style="margin-top:20px;animation:sup .7s ease .2s forwards;opacity:0">${wm(28,true)}</div>
+      <div style="margin-top:8px;font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#94a3b8;animation:sup .7s ease .35s forwards;opacity:0">Built on the tools.</div>
+      <div style="display:flex;gap:8px;margin-top:56px;animation:sup .7s ease .5s forwards;opacity:0">${[0,1,2].map(i=>`<div style="width:8px;height:8px;border-radius:50%;background:#2563eb;animation:dp 1.3s ease-in-out ${i*.22}s infinite"></div>`).join('')}</div>
+    </div>`;
+    setTimeout(()=>{S.phase=S.isAdmin||S.authUser?'pin':'auth';renderApp();},2400);
+    return;
+  }
+
+  if(S.phase==='auth'){root.innerHTML=renderAuth();return;}
+
+  if(S.phase==='pin'){
+    const n=new Date(),h=n.getHours()%12||12,m=String(n.getMinutes()).padStart(2,'0'),ap=n.getHours()>=12?'PM':'AM';
+    const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],MONS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const LBLS=['','ABC','DEF','GHI','JKL','MNO','PQRS','TUV','WXYZ'];
+    root.innerHTML=`<div style="width:min(390px,100vw);height:min(844px,100vh);background:linear-gradient(160deg,#040c24 0%,#0f2875 45%,#1a4fc4 100%);border-radius:clamp(0px,3vw,28px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;box-shadow:0 30px 80px rgba(0,0,0,.9)">
+      ${logo(60)}<div style="margin-top:12px">${wm(18)}</div>
+      <div style="margin-top:4px;font-size:13px;color:rgba(147,197,253,.5)">Enter PIN to unlock</div>
+      <div style="font-size:48px;font-weight:900;color:#fff;margin-top:24px;letter-spacing:-1px">${h}:${m} <span style="font-size:22px;font-weight:700;color:rgba(147,197,253,.55)">${ap}</span></div>
+      <div style="font-size:13px;color:rgba(147,197,253,.4);margin-bottom:28px">${DAYS[n.getDay()]}, ${n.getDate()} ${MONS[n.getMonth()]} ${n.getFullYear()}</div>
+      <div id="pin-dots" style="display:flex;gap:16px;margin-bottom:6px">${pinDots()}</div>
+      <div id="pin-err" style="height:20px;font-size:13px;color:#fca5a5;font-weight:600;margin-bottom:14px"></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:228px">
+        ${['1','2','3','4','5','6','7','8','9'].map((k,i)=>`<button onclick="pk('${k}')" style="height:64px;border-radius:16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:#fff"><span style="font-size:24px;font-weight:600;line-height:1">${k}</span><span style="font-size:9px;letter-spacing:.12em;color:rgba(255,255,255,.3);margin-top:2px">${LBLS[i+1]}</span></button>`).join('')}
+        <button onclick="unlockApp()" style="height:64px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,.4)"><path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.47-5.57 1.41-.24.13-.54.04-.68-.2-.13-.24-.04-.55.2-.68C7.82 2.52 9.86 2 12.01 2c2.13 0 3.99.47 6.03 1.52.25.13.34.43.21.67-.09.18-.26.28-.44.28z"/></svg></button>
+        <button onclick="pk('0')" style="height:64px;border-radius:16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.07);cursor:pointer;color:#fff;font-size:24px;font-weight:600">0</button>
+        <button onclick="pdel()" style="height:64px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);cursor:pointer;display:flex;align-items:center;justify-content:center">${ic('del',22,'rgba(255,255,255,.4)')}</button>
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,.2);margin-top:20px">Default PIN: 1234 · Change in Settings</div>
+    </div>`;
+    return;
+  }
+
+  // APP
+  const h=new Date().getHours(),hd=h%12||12,mn=String(new Date().getMinutes()).padStart(2,'0'),ap=h>=12?'PM':'AM';
+  const daysLeft=trialDaysLeft();
+  const trialBanner=S.subStatus==='trial'&&!S.isAdmin?`<div style="background:linear-gradient(90deg,rgba(245,158,11,.2),rgba(245,158,11,.1));border-bottom:1px solid rgba(245,158,11,.3);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0"><span style="font-size:12px;color:#fbbf24;font-weight:600">⏰ ${daysLeft} day${daysLeft!==1?'s':''} left in trial</span><a href="https://buy.stripe.com/tradeflow" target="_blank" style="font-size:11px;font-weight:700;color:#fff;background:#f59e0b;padding:4px 10px;border-radius:8px;text-decoration:none">Subscribe $79/mo</a></div>`:'';
+
+  root.innerHTML=`<div style="width:min(390px,100vw);height:min(844px,100vh);background:#09090b;display:flex;flex-direction:column;border-radius:clamp(0px,3vw,28px);overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.9);border:1px solid rgba(255,255,255,.06)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 22px 4px;flex-shrink:0"><span style="font-size:14px;font-weight:600;color:#fff">${hd}:${mn} ${ap}</span><div style="display:flex;align-items:center;gap:6px"><div style="display:flex;gap:2px;align-items:flex-end">${[3,5,7,9].map(h=>`<div style="width:3px;height:${h}px;background:#fff;border-radius:1px"></div>`).join('')}</div><svg width="15" height="11" viewBox="0 0 15 11" fill="white"><path d="M7.5 2.2C4.9 2.2 2.6 3.3 1 5.1L0 4.1C1.9 1.9 4.5.6 7.5.6s5.6 1.3 7.5 3.5L14 5.1C12.4 3.3 10.1 2.2 7.5 2.2z"/></svg><svg width="25" height="12" viewBox="0 0 25 12" fill="white"><rect x=".5" y=".5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity=".35" fill="none"/><rect x="2" y="2" width="18" height="8" rx="2" fill="white"/></svg></div></div>
+    ${trialBanner}
+    <div id="screen" style="flex:1;overflow:hidden">${(SCREENS[S.screen]||renderDash)()}</div>
+    <div style="display:flex;align-items:center;padding:8px 8px 20px;flex-shrink:0;background:rgba(9,9,11,.97);border-top:1px solid #27272a">
+      ${[{id:'dashboard',l:'Home',i:'home'},{id:'jobs',l:'Jobs',i:'jobs'},{id:'_fab',l:'',i:'mic'},{id:'invoices',l:'Invoices',i:'doc'},{id:'more',l:'More',i:'more'}].map(tab=>{
+        if(tab.id==='_fab')return`<div style="flex:1;display:flex;justify-content:center"><button onclick="go('voice')" style="width:56px;height:56px;border-radius:50%;background:${t.a};border:none;display:flex;align-items:center;justify-content:center;margin-top:-20px;box-shadow:0 4px 24px ${t.c};cursor:pointer">${ic('mic',24,'#fff')}</button></div>`;
+        const active=S.screen===tab.id||(tab.id==='more'&&!MAIN.includes(S.screen));
+        const col=active?t.d:'#52525b';
+        return`<button onclick="go('${tab.id}')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;background:none;border:none;cursor:pointer"><span style="color:${col}">${ic(tab.i,20,col)}</span><span style="font-size:10px;font-weight:700;color:${col}">${tab.l}</span></button>`;
+      }).join('')}
+    </div>
+  </div>`;
+};
+
+// ─── BOOT ─────────────────────────────────────────────────
+window.speechSynthesis?.getVoices?.();
+renderApp();
+</script>
+</body>
+</html>

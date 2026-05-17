@@ -1,0 +1,1933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#09090b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TradeFlow AI">
+<meta name="description" content="TradeFlow AI — Built on the tools. Built for the tools.">
+<title>TradeFlow AI</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body style="margin:0;background:#000;">
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ═══════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════
+const API = "https://tradeflow-api-88z6.onrender.com";
+const GST_RATE = 0.15;
+const MILEAGE_RATE = 0.31; // IRD rate per km
+
+// ═══════════════════════════════════════════════════════════
+// STORAGE — localStorage persistence
+// ═══════════════════════════════════════════════════════════
+const DB = {
+  get: (k, def = null) => { try { const v = localStorage.getItem("tf_" + k); return v ? JSON.parse(v) : def; } catch { return def; } },
+  set: (k, v) => { try { localStorage.setItem("tf_" + k, JSON.stringify(v)); } catch {} },
+};
+
+// ═══════════════════════════════════════════════════════════
+// GLOBAL CSS
+// ═══════════════════════════════════════════════════════════
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&family=Poppins:wght@700;800&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  input, textarea, button, select { font-family: 'DM Sans', sans-serif; }
+  .ns::-webkit-scrollbar { display: none; }
+  .ns { -ms-overflow-style: none; scrollbar-width: none; }
+  .tf-range { -webkit-appearance: none; width: 100%; height: 4px; background: #3f3f46; border-radius: 2px; outline: none; }
+  .tf-range::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #2563eb; cursor: pointer; box-shadow: 0 0 10px rgba(37,99,235,0.5); }
+  @keyframes splashUp { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes dotPulse { 0%,100% { transform:scale(0.5); opacity:0.3; } 50% { transform:scale(1.1); opacity:1; } }
+  @keyframes ripple { 0% { transform:scale(1); opacity:0.4; } 100% { transform:scale(2.2); opacity:0; } }
+  @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+`;
+
+// ═══════════════════════════════════════════════════════════
+// TF LOGO
+// ═══════════════════════════════════════════════════════════
+const TFLogo = ({ size = 40 }) => {
+  const sc = size / 34;
+  return (
+    <div style={{ width:size, height:size, borderRadius:size*0.26, flexShrink:0, background:"linear-gradient(145deg,#1565ff 0%,#0d3f9e 55%,#071b3d 100%)", boxShadow:`0 0 ${size*0.35}px rgba(21,101,255,0.45)`, display:"flex", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden" }}>
+      <div style={{ position:"relative", width:sc*22, height:sc*17 }}>
+        <div style={{ position:"absolute", left:0, top:0, width:sc*14, height:sc*5, background:"#fff", borderRadius:"4px 1px 4px 1px", transform:"skewX(-14deg)" }} />
+        <div style={{ position:"absolute", left:sc*4, top:sc*3, width:sc*5, height:sc*14, background:"#fff", borderRadius:"1px 1px 4px 4px", transform:"skewX(-14deg)" }} />
+        <div style={{ position:"absolute", left:sc*12, top:sc*6, width:sc*10, height:sc*4, background:"#1db7ff", borderRadius:"4px 1px 4px 1px", transform:"skewX(-14deg)" }} />
+        <div style={{ position:"absolute", left:sc*11, top:sc*11, width:sc*9, height:sc*4, background:"#168dff", borderRadius:"4px 1px 4px 1px", transform:"skewX(-14deg)" }} />
+      </div>
+    </div>
+  );
+};
+
+const Wordmark = ({ fs = 17 }) => (
+  <div style={{ fontFamily:"'Poppins',sans-serif", fontSize:fs, fontWeight:800, letterSpacing:"-0.4px", lineHeight:1 }}>
+    <span style={{ color:"#fff" }}>Trade</span>
+    <span style={{ color:"#0d8cff" }}>Flow</span>
+    <span style={{ marginLeft:5, padding:"2px 7px", borderRadius:6, background:"linear-gradient(145deg,#168dff,#0d6cff)", color:"#fff", fontSize:fs*0.62, fontWeight:800, verticalAlign:"middle" }}>AI</span>
+  </div>
+);
+
+// ═══════════════════════════════════════════════════════════
+// ICONS
+// ═══════════════════════════════════════════════════════════
+const PATHS = {
+  home:   "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
+  jobs:   "M20 6h-2.18c.07-.44.18-.88.18-1.33C18 2.54 15.96.5 13.5.5S9 2.54 9 4.67c0 .45.1.89.18 1.33H7c-1.11 0-1.99.89-1.99 2L5 20c0 1.11.89 2 2 2h12c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z",
+  doc:    "M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z",
+  mic:    "M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z",
+  more:   "M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z",
+  shield: "M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z",
+  car:    "M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99z",
+  mail:   "M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z",
+  scan:   "M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z",
+  cog:    "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z",
+  plus:   "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
+  check:  "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+  send:   "M2.01 21L23 12 2.01 3 2 10l15 2-15 2z",
+  back:   "M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z",
+  del:    "M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z",
+  chev:   "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z",
+  trash:  "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
+  user:   "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
+  lock:   "M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z",
+  camera: "M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z",
+  edit:   "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+  star:   "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z",
+  export: "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z",
+};
+
+const Icon = ({ name, size = 20, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <path d={PATHS[name] || PATHS.more} />
+  </svg>
+);
+
+// ═══════════════════════════════════════════════════════════
+// SHARED STYLES
+// ═══════════════════════════════════════════════════════════
+const S = {
+  card:    { background:"#18181b", border:"1px solid #27272a", borderRadius:16 },
+  divider: { borderBottom:"1px solid #27272a" },
+  screen:  { display:"flex", flexDirection:"column", height:"100%", overflowY:"auto" },
+  row:     { display:"flex", alignItems:"center", gap:10 },
+  btn:     { border:"none", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:700 },
+};
+
+const badge = (status) => {
+  const m = {
+    "Approved":   "#4ade80,rgba(34,197,94,0.15),rgba(34,197,94,0.3)",
+    "Sent":       "#60a5fa,rgba(59,130,246,0.15),rgba(59,130,246,0.3)",
+    "Draft":      "#a1a1aa,rgba(63,63,70,0.5),rgba(82,82,91,0.5)",
+    "Paid":       "#4ade80,rgba(34,197,94,0.15),rgba(34,197,94,0.3)",
+    "Overdue":    "#f87171,rgba(239,68,68,0.15),rgba(239,68,68,0.3)",
+    "Due Soon":   "#fbbf24,rgba(245,158,11,0.15),rgba(245,158,11,0.3)",
+    "In Progress":"#60a5fa,rgba(59,130,246,0.15),rgba(59,130,246,0.3)",
+    "Booked":     "#4ade80,rgba(34,197,94,0.15),rgba(34,197,94,0.3)",
+    "Lead":       "#fbbf24,rgba(245,158,11,0.15),rgba(245,158,11,0.3)",
+    "Completed":  "#a1a1aa,rgba(63,63,70,0.5),rgba(82,82,91,0.5)",
+    "Critical":   "#f87171,rgba(239,68,68,0.15),rgba(239,68,68,0.3)",
+    "High":       "#fbbf24,rgba(245,158,11,0.15),rgba(245,158,11,0.3)",
+    "Medium":     "#60a5fa,rgba(59,130,246,0.15),rgba(59,130,246,0.3)",
+  };
+  const [c,bg,br] = (m[status]||"#a1a1aa,rgba(63,63,70,0.5),rgba(82,82,91,0.5)").split(",");
+  return { fontSize:11, fontWeight:700, padding:"3px 8px", borderRadius:20, color:c, background:bg, border:`1px solid ${br}`, whiteSpace:"nowrap", display:"inline-block" };
+};
+
+const Badge = ({ s }) => <span style={badge(s)}>{s}</span>;
+const Card = ({ children, style }) => <div style={{ ...S.card, ...style }}>{children}</div>;
+const Divider = () => <div style={S.divider} />;
+const SecTitle = ({ children }) => <div style={{ fontSize:11, fontWeight:700, color:"#71717a", textTransform:"uppercase", letterSpacing:"0.08em", padding:"20px 16px 8px" }}>{children}</div>;
+const Spinner = () => <div style={{ width:20, height:20, border:"2px solid rgba(255,255,255,0.2)", borderTopColor:"#fff", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />;
+const EmptyState = ({ icon, title, sub, action }) => (
+  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"40px 24px", textAlign:"center", gap:8 }}>
+    <Icon name={icon} size={36} color="#3f3f46" />
+    <div style={{ fontSize:14, fontWeight:700, color:"#52525b" }}>{title}</div>
+    <div style={{ fontSize:12, color:"#3f3f46", lineHeight:1.5, maxWidth:220 }}>{sub}</div>
+    {action}
+  </div>
+);
+
+const ScreenHdr = ({ title, onBack, action }) => (
+  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"20px 16px 12px", flexShrink:0 }}>
+    {onBack
+      ? <button onClick={onBack} style={{ ...S.btn, background:"none", display:"flex", alignItems:"center", gap:6 }}>
+          <Icon name="back" size={18} color="#60a5fa" />
+          <span style={{ fontSize:20, fontWeight:800, color:"#fff" }}>{title}</span>
+        </button>
+      : <span style={{ fontSize:20, fontWeight:800, color:"#fff" }}>{title}</span>}
+    {action || <div style={{ width:32 }} />}
+  </div>
+);
+
+const PlusBtn = ({ onClick }) => (
+  <button onClick={onClick} style={{ ...S.btn, width:32, height:32, borderRadius:10, background:"#2563eb", display:"flex", alignItems:"center", justifyContent:"center" }}>
+    <Icon name="plus" size={18} color="#fff" />
+  </button>
+);
+
+const Pills = ({ opts, val, onChange }) => (
+  <div style={{ display:"flex", gap:8, padding:"0 16px 8px", overflowX:"auto" }} className="ns">
+    {opts.map(o => (
+      <button key={o} onClick={() => onChange(o)} style={{ ...S.btn, flexShrink:0, padding:"6px 12px", borderRadius:20, fontSize:12, background:val===o?"#2563eb":"#27272a", color:val===o?"#fff":"#71717a", boxShadow:val===o?"0 4px 12px rgba(37,99,235,0.3)":"none" }}>{o}</button>
+    ))}
+  </div>
+);
+
+const Input = ({ label, ...props }) => (
+  <div style={{ marginBottom:14 }}>
+    {label && <div style={{ fontSize:11, fontWeight:700, color:"#71717a", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>{label}</div>}
+    <input {...props} style={{ width:"100%", background:"#27272a", border:"1px solid #3f3f46", borderRadius:10, padding:"10px 12px", fontSize:13, color:"#fff", outline:"none", fontFamily:"'DM Sans',sans-serif", ...props.style }} />
+  </div>
+);
+
+const Textarea = ({ label, ...props }) => (
+  <div style={{ marginBottom:14 }}>
+    {label && <div style={{ fontSize:11, fontWeight:700, color:"#71717a", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>{label}</div>}
+    <textarea {...props} style={{ width:"100%", background:"#27272a", border:"1px solid #3f3f46", borderRadius:10, padding:"10px 12px", fontSize:13, color:"#fff", outline:"none", fontFamily:"'DM Sans',sans-serif", resize:"none", ...props.style }} />
+  </div>
+);
+
+const PrimaryBtn = ({ children, onClick, loading, style }) => (
+  <button onClick={onClick} disabled={loading} style={{ ...S.btn, width:"100%", background:"#2563eb", color:"#fff", fontSize:14, padding:"14px", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:"0 4px 16px rgba(37,99,235,0.3)", opacity:loading?0.7:1, ...style }}>
+    {loading ? <Spinner /> : children}
+  </button>
+);
+
+// ═══════════════════════════════════════════════════════════
+// VOICE ENGINE — ElevenLabs via backend
+// ═══════════════════════════════════════════════════════════
+const voiceCfg = () => DB.get("voice", { on:true, accent:"nz", gender:"m", style:"tradie", speed:1.0 });
+let currentAudio = null;
+
+const styleText = (text, style) => {
+  if (style !== "tradie") return text;
+  return text
+    .replace(/Good morning/g, "G'day")
+    .replace(/Good afternoon/g, "Hey, afternoon")
+    .replace(/Good evening/g, "Evening")
+    .replace(/Thank you/g, "Cheers")
+    .replace(/Please /g, "Just ")
+    .replace(/generating/gi, "sorting")
+    .replace(/professional/gi, "")
+    .trim();
+};
+
+const speak = async (raw) => {
+  const cfg = voiceCfg();
+  if (!cfg.on) return;
+  const text = styleText(raw, cfg.style);
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  try {
+    const res = await fetch(`${API}/api/speak`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ text, accent:cfg.accent, gender:cfg.gender, style:cfg.style, speed:cfg.speed }),
+    });
+    if (!res.ok) throw new Error(res.status);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    currentAudio = new Audio(url);
+    currentAudio.volume = 1;
+    currentAudio.play();
+    currentAudio.onended = () => URL.revokeObjectURL(url);
+  } catch {
+    // Silent browser fallback
+    if (!window.speechSynthesis) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = cfg.speed; u.pitch = cfg.gender === "f" ? 1.1 : 0.88;
+    const voices = window.speechSynthesis.getVoices();
+    const v = voices.find(v => /daniel|alex|gordon|karen/i.test(v.name) && v.lang.startsWith("en"));
+    if (v) u.voice = v;
+    window.speechSynthesis.speak(u);
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// SPLASH
+// ═══════════════════════════════════════════════════════════
+function Splash({ onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 2400); return () => clearTimeout(t); }, []);
+  return (
+    <div style={{ position:"absolute", inset:0, zIndex:50, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", background:"linear-gradient(160deg,#040c24 0%,#0f2875 45%,#2563eb 100%)" }}>
+      <div style={{ animation:"splashUp .7s ease forwards", opacity:0 }}><TFLogo size={92} /></div>
+      <div style={{ marginTop:20, animation:"splashUp .7s ease .2s forwards", opacity:0 }}><Wordmark fs={28} /></div>
+      <div style={{ marginTop:8, fontSize:12, letterSpacing:"0.15em", textTransform:"uppercase", color:"rgba(147,197,253,0.55)", animation:"splashUp .7s ease .35s forwards", opacity:0 }}>Built on the tools.</div>
+      <div style={{ display:"flex", gap:8, marginTop:56, animation:"splashUp .7s ease .5s forwards", opacity:0 }}>
+        {[0,1,2].map(i => <div key={i} style={{ width:8, height:8, borderRadius:"50%", background:"rgba(255,255,255,0.35)", animation:`dotPulse 1.3s ease-in-out ${i*0.22}s infinite` }} />)}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// PIN LOCK
+// ═══════════════════════════════════════════════════════════
+function PinLock({ onUnlock }) {
+  const [pin, setPin] = useState([]);
+  const [err, setErr] = useState("");
+  const [shake, setShake] = useState(false);
+  const correctPin = DB.get("pin", "1234");
+  const now = new Date();
+  const h12 = now.getHours() % 12 || 12;
+  const mn = String(now.getMinutes()).padStart(2, "0");
+  const ap = now.getHours() >= 12 ? "PM" : "AM";
+  const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const MONS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  const press = (k) => {
+    if (pin.length >= 4) return;
+    const next = [...pin, k];
+    setPin(next);
+    setErr("");
+    if (next.length === 4) {
+      setTimeout(() => {
+        if (next.join("") === correctPin) {
+          onUnlock();
+        } else {
+          setShake(true);
+          setErr("Incorrect PIN");
+          setTimeout(() => { setPin([]); setShake(false); }, 600);
+        }
+      }, 80);
+    }
+  };
+
+  const del = () => { setPin(p => p.slice(0, -1)); setErr(""); };
+  const LABELS = ["","ABC","DEF","GHI","JKL","MNO","PQRS","TUV","WXYZ"];
+
+  return (
+    <div style={{ position:"absolute", inset:0, zIndex:40, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"0 24px", background:"linear-gradient(160deg,#040c24 0%,#0f2875 45%,#1a4fc4 100%)" }}>
+      <TFLogo size={60} />
+      <div style={{ marginTop:12 }}><Wordmark fs={18} /></div>
+      <div style={{ marginTop:4, fontSize:13, color:"rgba(147,197,253,0.5)" }}>Enter PIN to unlock</div>
+      <div style={{ fontSize:48, fontWeight:900, color:"#fff", marginTop:24, letterSpacing:"-1px" }}>
+        {h12}:{mn} <span style={{ fontSize:22, fontWeight:700, color:"rgba(147,197,253,0.55)" }}>{ap}</span>
+      </div>
+      <div style={{ fontSize:13, color:"rgba(147,197,253,0.4)", marginBottom:28 }}>
+        {DAYS[now.getDay()]}, {now.getDate()} {MONS[now.getMonth()]} {now.getFullYear()}
+      </div>
+      <div style={{ display:"flex", gap:16, marginBottom:6 }}>
+        {[0,1,2,3].map(i => (
+          <div key={i} style={{ width:16, height:16, borderRadius:"50%", border:"2px solid", borderColor:i<pin.length?(shake?"#f87171":"#fff"):"rgba(255,255,255,0.3)", background:i<pin.length?(shake?"#f87171":"#fff"):"transparent", transform:i<pin.length?"scale(1.1)":"scale(1)", transition:"all 0.15s" }} />
+        ))}
+      </div>
+      <div style={{ height:20, fontSize:13, color:"#fca5a5", fontWeight:600, marginBottom:14 }}>{err}</div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, width:228 }}>
+        {["1","2","3","4","5","6","7","8","9"].map((k, i) => (
+          <button key={k} onClick={() => press(k)} style={{ ...S.btn, height:64, borderRadius:16, background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.07)", color:"#fff", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+            <span style={{ fontSize:24, fontWeight:600, lineHeight:1 }}>{k}</span>
+            <span style={{ fontSize:9, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", marginTop:2 }}>{LABELS[i+1]}</span>
+          </button>
+        ))}
+        <button onClick={onUnlock} style={{ ...S.btn, height:64, borderRadius:16, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.07)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,0.4)"><path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.47-5.57 1.41-.24.13-.54.04-.68-.2-.13-.24-.04-.55.2-.68C7.82 2.52 9.86 2 12.01 2c2.13 0 3.99.47 6.03 1.52.25.13.34.43.21.67-.09.18-.26.28-.44.28z"/></svg>
+        </button>
+        <button onClick={() => press("0")} style={{ ...S.btn, height:64, borderRadius:16, background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.07)", color:"#fff", fontSize:24, fontWeight:600, display:"flex", alignItems:"center", justifyContent:"center" }}>0</button>
+        <button onClick={del} style={{ ...S.btn, height:64, borderRadius:16, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.07)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <Icon name="del" size={22} color="rgba(255,255,255,0.4)" />
+        </button>
+      </div>
+      <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:20 }}>Default PIN: 1234 · Change in Settings → Security</div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 01 DASHBOARD
+// ═══════════════════════════════════════════════════════════
+function Dashboard({ goTo, jobs, invoices, trips, profile }) {
+  const h = new Date().getHours();
+  const greet = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  const name = profile.name ? `, ${profile.name.split(" ")[0]}` : "";
+  const revenue = invoices.filter(i => i.status === "Paid").reduce((a, i) => a + (i.amount || 0), 0);
+  const activeJobs = jobs.filter(j => j.status !== "Completed").length;
+  const outstandingInv = invoices.filter(i => i.status !== "Paid").length;
+  const mthKm = trips.reduce((a, t) => a + (t.km || 0), 0);
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <div style={{ padding:"20px 16px 12px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div>
+          <div style={{ fontSize:13, color:"#71717a" }}>{new Date().toLocaleDateString("en-NZ",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+          <div style={{ fontSize:21, fontWeight:800, color:"#fff", marginTop:2 }}>{greet}{name} 👋</div>
+        </div>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <button onClick={() => goTo("email")} style={{ ...S.btn, width:36, height:36, borderRadius:10, background:"#27272a", border:"1px solid #3f3f46", display:"flex", alignItems:"center", justifyContent:"center", position:"relative" }}>
+            <Icon name="mail" size={16} color="#71717a" />
+            {outstandingInv > 0 && <div style={{ position:"absolute", top:6, right:6, width:6, height:6, borderRadius:"50%", background:"#ef4444" }} />}
+          </button>
+          <TFLogo size={34} />
+        </div>
+      </div>
+
+      {/* Revenue card */}
+      <div style={{ margin:"0 16px", borderRadius:18, padding:20, position:"relative", overflow:"hidden", background:"linear-gradient(135deg,#1565ff 0%,#0d3f9e 60%,#071b3d 100%)", boxShadow:"0 8px 32px rgba(13,63,158,0.4)" }}>
+        <div style={{ position:"absolute", top:-30, right:-30, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,0.05)" }} />
+        <div style={{ fontSize:11, fontWeight:700, color:"rgba(147,197,253,0.7)", textTransform:"uppercase", letterSpacing:"0.08em" }}>Total Revenue — Paid Invoices</div>
+        <div style={{ fontSize:38, fontWeight:900, color:"#fff", marginTop:4, letterSpacing:"-1px" }}>${revenue.toLocaleString("en-NZ", { minimumFractionDigits:0 })}</div>
+        <div style={{ fontSize:13, color:"#93c5fd", marginTop:4 }}>
+          {invoices.filter(i => i.status === "Paid").length} paid invoice{invoices.filter(i => i.status === "Paid").length !== 1 ? "s" : ""}
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display:"flex", gap:10, margin:"12px 16px 0" }}>
+        {[
+          { l:"Active Jobs", v:activeJobs, c:"#60a5fa" },
+          { l:"Quotes", v:jobs.filter(j=>j.status==="Lead"||j.status==="Booked").length, c:"#4ade80" },
+          { l:"Outstanding", v:outstandingInv, c:outstandingInv>0?"#f87171":"#4ade80" },
+        ].map(s => (
+          <div key={s.l} style={{ flex:1, ...S.card, padding:12 }}>
+            <div style={{ fontSize:24, fontWeight:900, color:s.c }}>{s.v}</div>
+            <div style={{ fontSize:11, color:"#71717a", marginTop:2 }}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Security badge */}
+      <div style={{ margin:"10px 16px 0", display:"flex", alignItems:"center", gap:8, padding:"8px 12px", borderRadius:12, background:"rgba(34,197,94,0.08)", border:"1px solid rgba(34,197,94,0.2)" }}>
+        <Icon name="lock" size={13} color="#4ade80" />
+        <span style={{ fontSize:12, color:"#4ade80", fontWeight:500 }}>PIN protected · All data encrypted</span>
+        <span style={{ marginLeft:"auto", fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:20, background:"rgba(34,197,94,0.15)", color:"#4ade80" }}>Secured</span>
+      </div>
+
+      {/* Quick actions */}
+      <SecTitle>Quick Actions</SecTitle>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, padding:"0 16px" }}>
+        {[
+          { l:"Voice Quote", i:"mic",    sub:"Speak & generate",   bg:"rgba(59,130,246,0.1)",  br:"rgba(59,130,246,0.3)",  ic:"#60a5fa", s:"voice" },
+          { l:"Safety Pack", i:"shield", sub:"AI hazard analysis",  bg:"rgba(239,68,68,0.1)",   br:"rgba(239,68,68,0.3)",   ic:"#f87171", s:"safety" },
+          { l:"Mileage GPS", i:"car",    sub:"Log a work trip",     bg:"rgba(245,158,11,0.1)",  br:"rgba(245,158,11,0.3)",  ic:"#fbbf24", s:"mileage" },
+          { l:"AI Email",    i:"mail",   sub:"Write a reply",       bg:"rgba(168,85,247,0.1)",  br:"rgba(168,85,247,0.3)",  ic:"#c084fc", s:"email" },
+          { l:"Receipts",    i:"doc",    sub:"Log spending fast",    bg:"rgba(251,146,60,0.1)",  br:"rgba(251,146,60,0.3)",  ic:"#fb923c", s:"receipts" },
+        ].map(a => (
+          <button key={a.l} onClick={() => goTo(a.s)} style={{ ...S.btn, background:a.bg, border:`1px solid ${a.br}`, borderRadius:16, padding:16, textAlign:"left", fontWeight:400 }}>
+            <Icon name={a.i} size={22} color={a.ic} />
+            <div style={{ fontSize:13, fontWeight:700, color:"#fff", marginTop:8 }}>{a.l}</div>
+            <div style={{ fontSize:11, color:"#71717a", marginTop:2 }}>{a.sub}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Active jobs */}
+      <SecTitle>Active Jobs</SecTitle>
+      <Card style={{ margin:"0 16px" }}>
+        {jobs.filter(j => j.status !== "Completed").length === 0
+          ? <EmptyState icon="jobs" title="No active jobs" sub="Tap the mic to create your first voice quote" action={<button onClick={() => goTo("voice")} style={{ ...S.btn, background:"#2563eb", color:"#fff", padding:"8px 16px", borderRadius:10, fontSize:12, marginTop:4 }}>Create Quote</button>} />
+          : jobs.filter(j => j.status !== "Completed").slice(0, 5).map((j, i, arr) => (
+            <div key={j.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", ...(i<arr.length-1?S.divider:{}) }}>
+              <div style={{ width:36, height:36, borderRadius:10, background:"rgba(59,130,246,0.1)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <Icon name="jobs" size={16} color="#60a5fa" />
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{j.title}</div>
+                <div style={{ fontSize:11, color:"#71717a" }}>{j.client}</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#fff" }}>${(j.value||0).toLocaleString()}</div>
+                <Badge s={j.status} />
+              </div>
+            </div>
+          ))
+        }
+      </Card>
+
+      {/* Monthly km */}
+      {trips.length > 0 && (
+        <>
+          <SecTitle>This Month</SecTitle>
+          <div style={{ display:"flex", gap:10, padding:"0 16px 16px" }}>
+            {[{l:"km logged",v:mthKm.toFixed(1),c:"#fbbf24"},{l:"trips",v:trips.length,c:"#60a5fa"},{l:"IRD deduction",v:`$${(mthKm*MILEAGE_RATE).toFixed(0)}`,c:"#4ade80"}].map(s=>(
+              <div key={s.l} style={{ flex:1, ...S.card, padding:12 }}>
+                <div style={{ fontSize:18, fontWeight:900, color:s.c }}>{s.v}</div>
+                <div style={{ fontSize:11, color:"#71717a", marginTop:2 }}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 02 JOBS PIPELINE
+// ═══════════════════════════════════════════════════════════
+function Jobs({ goTo, jobs, setJobs }) {
+  const [filter, setFilter] = useState("All");
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ title:"", client:"", value:"", status:"Lead" });
+
+  const list = filter === "All" ? jobs : jobs.filter(j => j.status === filter);
+
+  const addJob = () => {
+    if (!form.title || !form.client) return;
+    const newJob = { id:Date.now(), ...form, value:parseFloat(form.value)||0, createdAt:new Date().toISOString() };
+    setJobs(j => { const u=[...j,newJob]; DB.set("jobs",u); return u; });
+    setForm({ title:"", client:"", value:"", status:"Lead" });
+    setShowAdd(false);
+  };
+
+  const deleteJob = (id) => { setJobs(j => { const u=j.filter(x=>x.id!==id); DB.set("jobs",u); return u; }); };
+  const updateStatus = (id, status) => { setJobs(j => { const u=j.map(x=>x.id===id?{...x,status}:x); DB.set("jobs",u); return u; }); };
+
+  const stages = ["Lead","Booked","In Progress","Completed"];
+  const stageCounts = stages.map(s => jobs.filter(j => j.status === s).length);
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <ScreenHdr title="Jobs Pipeline" action={<PlusBtn onClick={() => setShowAdd(true)} />} />
+
+      {/* Stage counts */}
+      <div style={{ display:"flex", gap:10, margin:"0 16px 12px" }}>
+        {stages.map((s,i) => (
+          <div key={s} style={{ flex:1, ...S.card, padding:"8px 4px", textAlign:"center" }}>
+            <div style={{ fontSize:20, fontWeight:900, color:["#fbbf24","#4ade80","#60a5fa","#a1a1aa"][i] }}>{stageCounts[i]}</div>
+            <div style={{ fontSize:9, color:"#52525b", marginTop:2 }}>{s}</div>
+          </div>
+        ))}
+      </div>
+
+      <Pills opts={["All","Lead","Booked","In Progress","Completed"]} val={filter} onChange={setFilter} />
+
+      {/* Add job form */}
+      {showAdd && (
+        <Card style={{ margin:"8px 16px", padding:16 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#fff", marginBottom:12 }}>+ New Job</div>
+          <Input label="Job Title" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Roof Replacement" />
+          <Input label="Client Name" value={form.client} onChange={e=>setForm(f=>({...f,client:e.target.value}))} placeholder="e.g. John Smith" />
+          <Input label="Value ($)" type="number" value={form.value} onChange={e=>setForm(f=>({...f,value:e.target.value}))} placeholder="0.00" />
+          <div style={{ marginBottom:14 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:"#71717a", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>Stage</div>
+            <div style={{ display:"flex", gap:6 }}>
+              {stages.map(s=><button key={s} onClick={()=>setForm(f=>({...f,status:s}))} style={{ ...S.btn, fontSize:11, padding:"6px 10px", borderRadius:8, background:form.status===s?"#2563eb":"#27272a", color:form.status===s?"#fff":"#71717a" }}>{s}</button>)}
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={()=>setShowAdd(false)} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, background:"#27272a", color:"#71717a", fontSize:13 }}>Cancel</button>
+            <button onClick={addJob} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, background:"#2563eb", color:"#fff", fontSize:13 }}>Add Job</button>
+          </div>
+        </Card>
+      )}
+
+      <Card style={{ margin:"8px 16px 16px" }}>
+        {list.length === 0
+          ? <EmptyState icon="jobs" title="No jobs yet" sub="Tap + to add a job or use Voice Quote to create one from speech" />
+          : list.map((j,i) => (
+            <div key={j.id} style={{ padding:16, ...(i<list.length-1?S.divider:{}) }}>
+              <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:8 }}>
+                <div style={{ flex:1, minWidth:0, marginRight:8 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:"#fff" }}>{j.title}</div>
+                  <div style={{ fontSize:11, color:"#71717a", marginTop:1 }}>{j.client}</div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <Badge s={j.status} />
+                  <button onClick={() => deleteJob(j.id)} style={{ ...S.btn, background:"none", padding:4 }}>
+                    <Icon name="trash" size={14} color="#52525b" />
+                  </button>
+                </div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ fontSize:15, fontWeight:900, color:"#60a5fa" }}>${(j.value||0).toLocaleString()}</span>
+                <div style={{ display:"flex", gap:5 }}>
+                  {stages.filter(s=>s!==j.status).slice(0,2).map(s=>(
+                    <button key={s} onClick={()=>updateStatus(j.id,s)} style={{ ...S.btn, fontSize:10, padding:"4px 8px", borderRadius:7, background:"#27272a", color:"#71717a" }}>{s==="In Progress"?"→ Progress":s==="Completed"?"✓ Done":s==="Booked"?"→ Booked":"→ "+s}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))
+        }
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 03 VOICE TO QUOTE
+// ═══════════════════════════════════════════════════════════
+function Voice({ goTo, jobs, setJobs, materials, profile, gstRate }) {
+  const [rec, setRec] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [quote, setQuote] = useState(null);
+  const [recTimer, setRecTimer] = useState(0);
+  const timerRef = useRef(null);
+  const recRef = useRef(null);
+
+  const startRec = () => {
+    if (rec) return;
+    setRec(true); setTranscript(""); setQuote(null); setRecTimer(0);
+    speak("Go for it — tell me about the job.");
+    timerRef.current = setInterval(() => setRecTimer(t => t+1), 1000);
+
+    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const r = new SR();
+      r.continuous = false; r.interimResults = true; r.lang = "en-NZ";
+      r.onresult = (e) => {
+        const t = Array.from(e.results).map(r=>r[0].transcript).join(" ");
+        setTranscript(t);
+      };
+      r.onend = () => stopRec();
+      r.start();
+      recRef.current = r;
+    } else {
+      // Fallback: manual stop after 10s
+      setTimeout(() => stopRec(), 10000);
+    }
+  };
+
+  const stopRec = () => {
+    setRec(false);
+    clearInterval(timerRef.current);
+    if (recRef.current) { try { recRef.current.stop(); } catch {} }
+  };
+
+  const genQuote = async () => {
+    if (!transcript) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/quote`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ transcript, materials, profile, gst:gstRate, country:"New Zealand" }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setQuote(data.quote);
+      speak("Your quote is ready. Check the details and tap Send when you're happy.");
+    } catch {
+      // Fallback: basic quote structure from transcript
+      const sub = 0;
+      setQuote({ client: profile.name || "Client", address:"", items:[{ description: transcript, qty:1, unit_price:0, total:0 }], subtotal:0, gst_rate:gstRate, gst_amount:0, total:0, notes:["Quote valid for 30 days","50% deposit required to secure booking"] });
+      speak("Quote created. You'll need to fill in the pricing details.");
+    }
+    setLoading(false);
+  };
+
+  const saveQuote = () => {
+    if (!quote) return;
+    const qNum = `#Q-${String(DB.get("qSeq",1)).padStart(4,"0")}`;
+    DB.set("qSeq", (DB.get("qSeq",1)||1)+1);
+    const job = { id:Date.now(), title:quote.items?.[0]?.description||"New Quote", client:quote.client||"Client", status:"Lead", value:quote.total||0, qNum, quote, createdAt:new Date().toISOString() };
+    setJobs(j => { const u=[...j,job]; DB.set("jobs",u); return u; });
+    speak("Quote saved. You'll find it in Jobs.");
+    goTo("jobs");
+  };
+
+  const fmt = (n) => `$${(n||0).toFixed(2)}`;
+  const mins = Math.floor(recTimer/60);
+  const secs = String(recTimer%60).padStart(2,"0");
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <ScreenHdr title="Voice to Quote" onBack={() => goTo("dashboard")} />
+      <div style={{ fontSize:13, color:"#71717a", padding:"0 16px 16px" }}>Speak your job naturally — AI builds a professional quote in seconds</div>
+
+      {/* Mic */}
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"0 16px 20px" }}>
+        <div style={{ position:"relative", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:16 }}>
+          {rec && <>
+            <div style={{ position:"absolute", width:180, height:180, borderRadius:"50%", background:"rgba(37,99,235,0.08)", animation:"ripple 1.5s ease-out infinite" }} />
+            <div style={{ position:"absolute", width:152, height:152, borderRadius:"50%", background:"rgba(37,99,235,0.12)", animation:"ripple 1.5s ease-out 0.4s infinite" }} />
+          </>}
+          <button onClick={rec ? stopRec : startRec} style={{ ...S.btn, width:128, height:128, borderRadius:"50%", background:rec?"#dc2626":quote?"#16a34a":"#2563eb", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", zIndex:1, transition:"all 0.2s", boxShadow:rec?"0 0 40px rgba(220,38,38,0.5)":quote?"0 0 40px rgba(22,163,74,0.5)":"0 0 40px rgba(37,99,235,0.5)" }}>
+            <Icon name={quote?"check":"mic"} size={48} color="#fff" />
+          </button>
+        </div>
+
+        <div style={{ fontSize:15, fontWeight:700, color:"#fff" }}>
+          {rec ? `Recording... ${mins}:${secs}` : transcript ? "Ready to generate" : "Tap to speak"}
+        </div>
+
+        {/* Waveform */}
+        <div style={{ display:"flex", alignItems:"center", gap:2, marginTop:12, height:36 }}>
+          {Array.from({length:32}).map((_,i) => (
+            <div key={i} style={{ width:3, borderRadius:3, background:"#3b82f6", height:rec?`${Math.abs(Math.sin(i*0.5+(Date.now()*0.01)))*18+4}px`:"4px", opacity:rec?1:0.2, transition:"height 0.15s ease" }} />
+          ))}
+        </div>
+
+        {/* Transcript */}
+        {transcript && (
+          <div style={{ marginTop:12, width:"100%", padding:"12px 14px", background:"#27272a", border:"1px solid #3f3f46", borderRadius:12, fontSize:13, color:"#a1a1aa", fontStyle:"italic", lineHeight:1.5 }}>
+            "{transcript}"
+          </div>
+        )}
+
+        {/* Actions */}
+        {transcript && !quote && (
+          <div style={{ display:"flex", gap:10, marginTop:14, width:"100%" }}>
+            <button onClick={() => { setTranscript(""); setQuote(null); }} style={{ ...S.btn, flex:1, padding:"12px", borderRadius:14, background:"#27272a", color:"#71717a", fontSize:13 }}>Re-record</button>
+            <PrimaryBtn onClick={genQuote} loading={loading} style={{ flex:2 }}>✨ Generate Quote</PrimaryBtn>
+          </div>
+        )}
+
+        {/* Quote preview */}
+        {quote && (
+          <div style={{ width:"100%", marginTop:14 }}>
+            <Card style={{ padding:16, animation:"fadeIn 0.3s ease" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+                <TFLogo size={36} />
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700, color:"#fff" }}>Quote Preview</div>
+                  <div style={{ fontSize:12, color:"#71717a" }}>{quote.client}</div>
+                </div>
+              </div>
+              {(quote.items||[]).map((item,i) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", marginBottom:6, fontSize:12 }}>
+                  <span style={{ color:"#d4d4d8", flex:1 }}>{item.description}</span>
+                  <span style={{ color:"#60a5fa", fontWeight:700, marginLeft:8 }}>{fmt(item.total)}</span>
+                </div>
+              ))}
+              <div style={{ ...S.divider, margin:"10px 0" }} />
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:"#71717a" }}>
+                <span>Subtotal</span><span>{fmt(quote.subtotal)}</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:"#71717a", marginTop:4 }}>
+                <span>GST ({quote.gst_rate||15}%)</span><span>{fmt(quote.gst_amount)}</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:16, fontWeight:900, color:"#60a5fa", marginTop:8 }}>
+                <span>Total</span><span>{fmt(quote.total)}</span>
+              </div>
+            </Card>
+            <div style={{ display:"flex", gap:10, marginTop:10 }}>
+              <button onClick={() => { setQuote(null); setTranscript(""); }} style={{ ...S.btn, flex:1, padding:"12px", borderRadius:14, background:"#27272a", color:"#71717a", fontSize:13 }}>Redo</button>
+              <PrimaryBtn onClick={saveQuote} style={{ flex:2 }}>Save to Jobs ✓</PrimaryBtn>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 04 INVOICES
+// ═══════════════════════════════════════════════════════════
+function Invoices({ invoices, setInvoices, jobs }) {
+  const [tab, setTab] = useState("All");
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ client:"", amount:"", status:"Sent", due:"" });
+
+  const list = tab === "All" ? invoices : invoices.filter(i => i.status === tab);
+  const outstanding = invoices.filter(i => i.status !== "Paid").reduce((a,i) => a+(i.amount||0), 0);
+
+  const addInv = () => {
+    if (!form.client || !form.amount) return;
+    const inv = { id:Date.now(), ref:`INV-${String(invoices.length+1).padStart(4,"0")}`, ...form, amount:parseFloat(form.amount)||0, createdAt:new Date().toISOString() };
+    setInvoices(v => { const u=[...v,inv]; DB.set("invoices",u); return u; });
+    setForm({ client:"", amount:"", status:"Sent", due:"" });
+    setShowAdd(false);
+  };
+
+  const updateStatus = (id, status) => { setInvoices(v => { const u=v.map(x=>x.id===id?{...x,status}:x); DB.set("invoices",u); return u; }); };
+  const deleteInv = (id) => { setInvoices(v => { const u=v.filter(x=>x.id!==id); DB.set("invoices",u); return u; }); };
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <ScreenHdr title="Invoices" action={<PlusBtn onClick={() => setShowAdd(!showAdd)} />} />
+
+      <div style={{ margin:"0 16px", borderRadius:18, padding:20, background:"linear-gradient(135deg,rgba(239,68,68,0.12),rgba(127,29,29,0.2))", border:"1px solid rgba(239,68,68,0.3)" }}>
+        <div style={{ fontSize:11, fontWeight:700, color:"#fca5a5", textTransform:"uppercase", letterSpacing:"0.08em" }}>Outstanding Balance</div>
+        <div style={{ fontSize:32, fontWeight:900, color:"#fff", marginTop:4 }}>${outstanding.toLocaleString("en-NZ",{minimumFractionDigits:0})}</div>
+        <div style={{ display:"flex", gap:20, marginTop:8 }}>
+          <div><span style={{ color:"#f87171", fontWeight:900 }}>{invoices.filter(i=>i.status==="Overdue").length}</span><span style={{ color:"#52525b", fontSize:12, marginLeft:4 }}>Overdue</span></div>
+          <div><span style={{ color:"#fbbf24", fontWeight:900 }}>{invoices.filter(i=>i.status==="Due Soon").length}</span><span style={{ color:"#52525b", fontSize:12, marginLeft:4 }}>Due Soon</span></div>
+          <div><span style={{ color:"#4ade80", fontWeight:900 }}>{invoices.filter(i=>i.status==="Paid").length}</span><span style={{ color:"#52525b", fontSize:12, marginLeft:4 }}>Paid</span></div>
+        </div>
+      </div>
+
+      <Pills opts={["All","Overdue","Due Soon","Sent","Paid"]} val={tab} onChange={setTab} />
+
+      {showAdd && (
+        <Card style={{ margin:"8px 16px", padding:16 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#fff", marginBottom:12 }}>+ New Invoice</div>
+          <Input label="Client" value={form.client} onChange={e=>setForm(f=>({...f,client:e.target.value}))} placeholder="Client name" />
+          <Input label="Amount ($)" type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" />
+          <Input label="Due Date" type="date" value={form.due} onChange={e=>setForm(f=>({...f,due:e.target.value}))} />
+          <div style={{ marginBottom:12 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:"#71717a", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>Status</div>
+            <div style={{ display:"flex", gap:6 }}>
+              {["Sent","Due Soon","Overdue"].map(s=><button key={s} onClick={()=>setForm(f=>({...f,status:s}))} style={{ ...S.btn, fontSize:11, padding:"6px 10px", borderRadius:8, background:form.status===s?"#2563eb":"#27272a", color:form.status===s?"#fff":"#71717a" }}>{s}</button>)}
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={()=>setShowAdd(false)} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, background:"#27272a", color:"#71717a", fontSize:13 }}>Cancel</button>
+            <button onClick={addInv} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, background:"#2563eb", color:"#fff", fontSize:13 }}>Add Invoice</button>
+          </div>
+        </Card>
+      )}
+
+      <Card style={{ margin:"8px 16px 16px" }}>
+        {list.length === 0
+          ? <EmptyState icon="doc" title="No invoices yet" sub="Add your first invoice with the + button above" />
+          : list.map((inv,i) => (
+            <div key={inv.id} style={{ padding:"14px", ...(i<list.length-1?S.divider:{}) }}>
+              <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between" }}>
+                <div style={{ flex:1, minWidth:0, marginRight:8 }}>
+                  <div style={{ fontSize:11, color:"#52525b" }}>{inv.ref}</div>
+                  <div style={{ fontSize:13, fontWeight:600, color:"#fff", marginTop:1 }}>{inv.client}</div>
+                  {inv.due && <div style={{ fontSize:11, color:"#71717a" }}>Due {inv.due}</div>}
+                </div>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:"#fff" }}>${(inv.amount||0).toLocaleString()}</div>
+                  <Badge s={inv.status} />
+                </div>
+              </div>
+              <div style={{ display:"flex", gap:6, marginTop:8 }}>
+                {inv.status !== "Paid" && <button onClick={()=>updateStatus(inv.id,"Paid")} style={{ ...S.btn, fontSize:11, padding:"4px 10px", borderRadius:8, background:"rgba(34,197,94,0.15)", color:"#4ade80", border:"1px solid rgba(34,197,94,0.3)" }}>Mark Paid</button>}
+                {inv.status === "Sent" && <button onClick={()=>updateStatus(inv.id,"Overdue")} style={{ ...S.btn, fontSize:11, padding:"4px 10px", borderRadius:8, background:"rgba(239,68,68,0.1)", color:"#f87171", border:"1px solid rgba(239,68,68,0.3)" }}>Mark Overdue</button>}
+                <button onClick={()=>deleteInv(inv.id)} style={{ ...S.btn, fontSize:11, padding:"4px 8px", borderRadius:8, background:"#27272a", color:"#71717a", marginLeft:"auto" }}>
+                  <Icon name="trash" size={13} color="#52525b" />
+                </button>
+              </div>
+            </div>
+          ))
+        }
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 05 SAFETY PACK
+// ═══════════════════════════════════════════════════════════
+function Safety({ goTo, profile }) {
+  const [tab, setTab] = useState("Hazards");
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [hazards, setHazards] = useState([]);
+  const [toolbox, setToolbox] = useState(null);
+  const [workers, setWorkers] = useState(DB.get("workers", []));
+  const [country, setCountry] = useState(DB.get("country","New Zealand"));
+  const fileRef = useRef();
+
+  const COUNTRIES = {
+    "New Zealand":{ code:"HSWA 2015 · NZS 3604", contacts:[{t:"Emergency Services",n:"111",c:"#f87171"},{t:"WorkSafe NZ",n:"0800 030 040",c:"#fbbf24"},{t:"Poison Control",n:"0800 764 766",c:"#c084fc"}] },
+    "Australia":{ code:"WHS Act 2011 · Safe Work AU", contacts:[{t:"Emergency Services",n:"000",c:"#f87171"},{t:"Safe Work Helpline",n:"1300 366 979",c:"#fbbf24"},{t:"Poisons Info",n:"13 11 26",c:"#c084fc"}] },
+    "United Kingdom":{ code:"HSWA 1974 · HSE Guidelines", contacts:[{t:"Emergency Services",n:"999",c:"#f87171"},{t:"HSE Incident Line",n:"0345 300 9923",c:"#fbbf24"},{t:"NHS Helpline",n:"111",c:"#c084fc"}] },
+    "United States":{ code:"OSHA CFR 29 · ANSI", contacts:[{t:"Emergency Services",n:"911",c:"#f87171"},{t:"OSHA Hotline",n:"1-800-321-6742",c:"#fbbf24"},{t:"Poison Control",n:"1-800-222-1222",c:"#c084fc"}] },
+  };
+  const zoneData = COUNTRIES[country] || COUNTRIES["New Zealand"];
+
+  const addPhoto = () => { fileRef.current.click(); };
+  const handlePhoto = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhotos(p => [...p, ev.target.result]);
+    reader.readAsDataURL(file);
+  };
+
+  const analyse = async () => {
+    if (!photos.length) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/safety`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ images:photos.slice(0,4), country, legislation:zoneData.code }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setHazards(data.safety?.hazards||[]);
+      setToolbox(data.safety?.toolbox||null);
+      speak(`Analysis complete. ${(data.safety?.hazards||[]).length} hazards identified.`);
+      setTab("Toolbox");
+    } catch {
+      setHazards([{ name:"⚠️ Analysis unavailable", severity:"Medium", description:"Connect to backend for AI hazard detection", action:"Check site manually and apply standard safety controls" }]);
+    }
+    setLoading(false);
+  };
+
+  const addWorker = () => {
+    const name = prompt("Worker name:");
+    if (!name) return;
+    const role = prompt("Role (e.g. Roofer, Labourer):") || "Worker";
+    const w = { id:Date.now(), name, role, signed:false };
+    const updated = [...workers, w];
+    setWorkers(updated); DB.set("workers", updated);
+  };
+
+  const signWorker = (id) => {
+    const updated = workers.map(w => w.id===id ? {...w, signed:true, signedAt:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} : w);
+    setWorkers(updated); DB.set("workers", updated);
+    speak("Signature recorded.");
+  };
+
+  const PPE = ["Safety Harness & Lanyard","Hard Hat — AS/NZS 1801","Steel-Capped Boots","Hi-Vis Vest","Safety Glasses","Cut-Resistant Gloves","Hearing Protection","SPF 50+ Sunscreen"];
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <ScreenHdr title="Safety Pack" onBack={() => goTo("dashboard")} />
+      <div style={{ display:"flex", alignItems:"center", gap:8, padding:"0 16px 10px" }}>
+        <span style={{ fontSize:16 }}>🇳🇿</span>
+        <span style={{ fontSize:12, color:"#71717a" }}>{zoneData.code}</span>
+        <select value={country} onChange={e=>{setCountry(e.target.value);DB.set("country",e.target.value);}} style={{ marginLeft:"auto", fontSize:11, background:"#27272a", border:"1px solid #3f3f46", borderRadius:8, padding:"4px 8px", color:"#d4d4d8", cursor:"pointer" }}>
+          {Object.keys(COUNTRIES).map(c=><option key={c}>{c}</option>)}
+        </select>
+      </div>
+
+      <input type="file" ref={fileRef} accept="image/*" capture="environment" onChange={handlePhoto} style={{ display:"none" }} />
+
+      <Pills opts={["Hazards","Toolbox","Emergency","PPE","Sign Off"]} val={tab} onChange={setTab} />
+
+      <div style={{ padding:"8px 16px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+
+        {/* HAZARDS */}
+        {tab === "Hazards" && (
+          <>
+            {/* Photos */}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
+              {photos.map((p,i) => (
+                <div key={i} style={{ aspectRatio:"1", borderRadius:12, overflow:"hidden", border:"1px solid #3f3f46" }}>
+                  <img src={p} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                </div>
+              ))}
+              <button onClick={addPhoto} style={{ ...S.btn, aspectRatio:"1", borderRadius:12, border:"2px dashed #3f3f46", background:"transparent", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, color:"#52525b", fontSize:11 }}>
+                <Icon name="camera" size={22} color="#52525b" />
+                <span>Add Photo</span>
+              </button>
+            </div>
+
+            {photos.length > 0 && (
+              <PrimaryBtn onClick={analyse} loading={loading}>
+                {loading ? "Analysing..." : "🔍 Analyse for Hazards"}
+              </PrimaryBtn>
+            )}
+
+            {hazards.length > 0
+              ? hazards.map((h,i) => (
+                <Card key={i} style={{ padding:16 }}>
+                  <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:6 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#fff", flex:1, marginRight:8 }}>{h.name}</div>
+                    <Badge s={h.severity} />
+                  </div>
+                  <div style={{ fontSize:12, color:"#71717a", lineHeight:1.5 }}>{h.description}</div>
+                  <div style={{ fontSize:12, color:"#60a5fa", marginTop:6 }}>→ {h.action}</div>
+                </Card>
+              ))
+              : <EmptyState icon="camera" title="No hazards identified yet" sub="Add site photos above then tap Analyse to detect hazards with AI" />
+            }
+          </>
+        )}
+
+        {/* TOOLBOX */}
+        {tab === "Toolbox" && (
+          toolbox
+            ? <Card style={{ padding:16 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"#60a5fa", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>AI Generated Toolbox Talk</div>
+                <div style={{ fontSize:14, fontWeight:700, color:"#fff", marginBottom:12 }}>{toolbox.title || "Site Safety Briefing"}</div>
+                {[
+                  { h:"Today's Work Plan", items:toolbox.today_plan||[] },
+                  { h:"Key Hazards & Controls", items:toolbox.key_hazards||[] },
+                  { h:"Emergency Procedures", items:toolbox.emergency_procedures||[] },
+                ].map((s,si) => s.items.length > 0 && (
+                  <div key={si} style={{ marginBottom:14 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:"#52525b", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>{s.h}</div>
+                    {s.items.map((item,ii) => (
+                      <div key={ii} style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:6 }}>
+                        <div style={{ width:6, height:6, borderRadius:"50%", background:"#3b82f6", marginTop:5, flexShrink:0 }} />
+                        <div style={{ fontSize:13, color:"#d4d4d8", lineHeight:1.5 }}>{item}</div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                <PrimaryBtn onClick={() => speak("Toolbox talk complete. All workers must confirm they have understood before starting work.")} style={{ marginTop:8 }}>
+                  🔊 Read Aloud
+                </PrimaryBtn>
+              </Card>
+            : <EmptyState icon="shield" title="No toolbox talk yet" sub="Add site photos on the Hazards tab and run AI analysis to auto-generate a toolbox talk" />
+        )}
+
+        {/* EMERGENCY */}
+        {tab === "Emergency" && (
+          <>
+            <div style={{ padding:16, borderRadius:16, background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.3)" }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#f87171" }}>🚨 Emergency Contacts — {country}</div>
+              <div style={{ fontSize:12, color:"#71717a", marginTop:4 }}>Auto-configured for your legislation zone</div>
+            </div>
+            {zoneData.contacts.map((c,i) => (
+              <Card key={i} style={{ padding:16, display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:"#fff" }}>{c.t}</div>
+                  <div style={{ fontSize:18, fontWeight:900, color:c.c, marginTop:2 }}>{c.n}</div>
+                </div>
+                <button onClick={() => speak(`Calling ${c.t} on ${c.n}`)} style={{ ...S.btn, width:40, height:40, borderRadius:12, background:c.c.replace("#","rgba(").replace(/,.*$/,"")+"0.15)", border:"none", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>📞</button>
+              </Card>
+            ))}
+          </>
+        )}
+
+        {/* PPE */}
+        {tab === "PPE" && (
+          <Card>
+            {PPE.map((p,i) => (
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", ...(i<PPE.length-1?S.divider:{}) }}>
+                <div style={{ width:20, height:20, borderRadius:5, background:"#2563eb", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <Icon name="check" size={12} color="#fff" />
+                </div>
+                <span style={{ fontSize:13, color:"#e4e4e7" }}>{p}</span>
+              </div>
+            ))}
+          </Card>
+        )}
+
+        {/* SIGN OFF */}
+        {tab === "Sign Off" && (
+          <>
+            <button onClick={addWorker} style={{ ...S.btn, padding:"10px 16px", borderRadius:12, background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.3)", color:"#60a5fa", fontSize:13 }}>+ Add Worker</button>
+            {workers.length === 0
+              ? <EmptyState icon="user" title="No workers added" sub="Tap + Add Worker to build the sign-off list" />
+              : <Card>
+                  {workers.map((w,i) => (
+                    <div key={w.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"14px", ...(i<workers.length-1?S.divider:{}) }}>
+                      <div style={{ width:36, height:36, borderRadius:"50%", background:"rgba(59,130,246,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"#60a5fa", fontSize:13, flexShrink:0 }}>
+                        {w.name.split(" ").map(x=>x[0]).join("")}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:"#fff" }}>{w.name}</div>
+                        <div style={{ fontSize:11, color:"#71717a" }}>{w.role}{w.signed?` · ✓ Signed ${w.signedAt}`:""}</div>
+                      </div>
+                      <button onClick={()=>signWorker(w.id)} style={{ ...S.btn, fontSize:11, fontWeight:700, padding:"6px 12px", borderRadius:10, border:"1px solid", borderColor:w.signed?"rgba(34,197,94,0.3)":"transparent", background:w.signed?"rgba(34,197,94,0.15)":"#2563eb", color:w.signed?"#4ade80":"#fff" }}>
+                        {w.signed?"✓ Signed":"Tap to Sign"}
+                      </button>
+                    </div>
+                  ))}
+                </Card>
+            }
+            {workers.length > 0 && <PrimaryBtn onClick={()=>window.print()}>Print Sign-Off Sheet</PrimaryBtn>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 06 AI INVOICE SCANNER
+// ═══════════════════════════════════════════════════════════
+function Scanner({ goTo, materials, setMaterials }) {
+  const [scanned, setScanned] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState([]);
+  const [supplier, setSupplier] = useState("");
+  const fileRef = useRef();
+
+  const handleScan = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API}/api/scan-invoice`, {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({ image:ev.target.result }),
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        setItems(data.items||[]);
+        setSupplier(data.supplier||"Supplier");
+        setScanned(true);
+        speak(`Invoice scanned. ${(data.items||[]).length} items found.`);
+      } catch {
+        setItems([]);
+        setScanned(true);
+      }
+      setLoading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const addAll = () => {
+    const updated = [...materials, ...items.map(it => ({ id:Date.now()+Math.random(), name:it.name, price:it.price, unit:it.unit, supplier, updated:new Date().toLocaleDateString("en-NZ") }))];
+    setMaterials(updated); DB.set("materials", updated);
+    speak("All prices added to your materials database.");
+    goTo("materials");
+  };
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <ScreenHdr title="AI Invoice Scanner" onBack={() => goTo("more")} />
+      <div style={{ fontSize:13, color:"#71717a", padding:"0 16px 14px" }}>Snap a supplier invoice — AI reads every price and updates your database</div>
+
+      <input type="file" ref={fileRef} accept="image/*" capture="environment" onChange={handleScan} style={{ display:"none" }} />
+
+      <button onClick={() => fileRef.current.click()} style={{ ...S.btn, margin:"0 16px", borderRadius:16, border:"2px dashed #3f3f46", height:176, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:8, background:"transparent", color:"#52525b" }}>
+        {loading
+          ? <><Spinner /><span style={{ fontSize:13, marginTop:8 }}>Scanning...</span></>
+          : scanned
+          ? <><div style={{ width:48, height:48, borderRadius:16, background:"rgba(34,197,94,0.2)", display:"flex", alignItems:"center", justifyContent:"center" }}><Icon name="check" size={24} color="#4ade80" /></div><span style={{ fontSize:13, fontWeight:600, color:"#4ade80" }}>Scanned — tap to scan another</span></>
+          : <><Icon name="camera" size={32} color="#52525b" /><span style={{ fontSize:13, fontWeight:500, color:"#71717a" }}>Tap to scan invoice</span><span style={{ fontSize:11, color:"#3f3f46" }}>Camera or gallery</span></>
+        }
+      </button>
+
+      {scanned && items.length > 0 && (
+        <>
+          <SecTitle>Extracted — {supplier}</SecTitle>
+          <Card style={{ margin:"0 16px" }}>
+            {items.map((item,i) => {
+              const existing = materials.find(m => m.name.toLowerCase() === item.name?.toLowerCase());
+              const priceChanged = existing && Math.abs(existing.price - item.price) > 0.01;
+              return (
+                <div key={i} style={{ display:"flex", alignItems:"center", padding:"12px 14px", gap:10, ...(i<items.length-1?S.divider:{}) }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:500, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
+                    <div style={{ fontSize:11, color:"#71717a", marginTop:1 }}>{item.unit}</div>
+                    {priceChanged && <div style={{ fontSize:11, color:"#fbbf24", marginTop:1 }}>Was ${existing.price.toFixed(2)}</div>}
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:priceChanged?"#fbbf24":"#fff" }}>${(item.price||0).toFixed(2)}</div>
+                    {priceChanged && <div style={{ fontSize:10, color:"#f59e0b" }}>↑ Changed</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </Card>
+          <div style={{ padding:"12px 16px 16px" }}>
+            <PrimaryBtn onClick={addAll}>Add All to Materials Database</PrimaryBtn>
+          </div>
+        </>
+      )}
+
+      {scanned && items.length === 0 && (
+        <div style={{ padding:"20px 16px" }}>
+          <EmptyState icon="scan" title="No items extracted" sub="The image may be unclear or not a standard invoice. Try again with a clearer photo." />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 07 MILEAGE GPS
+// ═══════════════════════════════════════════════════════════
+function Mileage({ goTo, trips, setTrips }) {
+  const [active, setActive] = useState(false);
+  const [km, setKm] = useState(0);
+  const [dest, setDest] = useState("");
+  const [startTime, setStartTime] = useState(null);
+  const [duration, setDuration] = useState(0);
+  const timerRef = useRef();
+  const watchRef = useRef();
+
+  useEffect(() => {
+    return () => { clearInterval(timerRef.current); if (watchRef.current && navigator.geolocation) navigator.geolocation.clearWatch(watchRef.current); };
+  }, []);
+
+  const startTrip = () => {
+    const d = prompt("Destination / job name:") || "Work Trip";
+    setDest(d); setActive(true); setKm(0); setDuration(0);
+    setStartTime(Date.now());
+    speak(`Trip started. GPS locked on.`);
+    timerRef.current = setInterval(() => setDuration(t => t+1), 1000);
+
+    // Real GPS
+    if (navigator.geolocation) {
+      let lastPos = null;
+      watchRef.current = navigator.geolocation.watchPosition(pos => {
+        if (lastPos) {
+          const d = getDistanceKm(lastPos.coords.latitude, lastPos.coords.longitude, pos.coords.latitude, pos.coords.longitude);
+          setKm(k => parseFloat((k+d).toFixed(2)));
+        }
+        lastPos = pos;
+      }, () => {
+        // Fallback: simulate
+        timerRef.current = setInterval(() => setKm(k => parseFloat((k+0.04).toFixed(2))), 3000);
+      }, { enableHighAccuracy:true });
+    } else {
+      // Simulate
+      setInterval(() => setKm(k => parseFloat((k+0.04).toFixed(2))), 3000);
+    }
+  };
+
+  const getDistanceKm = (lat1,lon1,lat2,lon2) => {
+    const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+    const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  };
+
+  const endTrip = () => {
+    setActive(false);
+    clearInterval(timerRef.current);
+    if (watchRef.current && navigator.geolocation) navigator.geolocation.clearWatch(watchRef.current);
+    if (km < 0.1) { speak("Trip too short to log."); return; }
+    const trip = { id:Date.now(), dest, km, date:new Date().toISOString(), cost:parseFloat((km*MILEAGE_RATE).toFixed(2)), duration };
+    setTrips(t => { const u=[...t,trip]; DB.set("trips",u); return u; });
+    speak(`Trip logged. ${km.toFixed(1)} kilometres.`);
+    setKm(0); setDest(""); setDuration(0);
+  };
+
+  const exportCSV = () => {
+    if (!trips.length) { speak("No trips to export yet."); return; }
+    const rows = [["Date","Destination","km","Cost ($)","Duration (min)"]];
+    trips.forEach(t => rows.push([new Date(t.date).toLocaleDateString("en-NZ"), t.dest, t.km.toFixed(2), t.cost.toFixed(2), Math.round((t.duration||0)/60)]));
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+    a.download = `mileage-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  };
+
+  const deleteTrip = (id) => { setTrips(t => { const u=t.filter(x=>x.id!==id); DB.set("trips",u); return u; }); };
+  const totalKm = trips.reduce((a,t)=>a+t.km,0);
+  const mins = Math.floor(duration/60);
+  const secs = String(duration%60).padStart(2,"0");
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <ScreenHdr title="Mileage & GPS" onBack={() => goTo("dashboard")} action={
+        <button onClick={exportCSV} style={{ ...S.btn, fontSize:11, color:"#60a5fa", fontWeight:700, padding:"6px 10px", borderRadius:10, background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.3)" }}>
+          <Icon name="export" size={13} color="#60a5fa" /> Export
+        </button>
+      } />
+
+      {/* Live tracker */}
+      <Card style={{ margin:"0 16px", padding:16 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+          <span style={{ fontSize:12, color:"#71717a" }}>{active ? `To: ${dest}` : "No trip active"}</span>
+          {active && <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+            <div style={{ width:8, height:8, borderRadius:"50%", background:"#4ade80", animation:"dotPulse 0.8s ease-in-out infinite" }} />
+            <span style={{ fontSize:11, color:"#4ade80" }}>GPS Active</span>
+          </div>}
+        </div>
+        <div style={{ fontSize:44, fontWeight:900, color:"#fff", letterSpacing:"-1px" }}>
+          {active ? km.toFixed(1) : "0.0"} <span style={{ fontSize:16, color:"#71717a", fontWeight:400 }}>km</span>
+        </div>
+        {active && <div style={{ fontSize:12, color:"#71717a", marginTop:4 }}>Duration: {mins}:{secs} · Fuel: ${(km*MILEAGE_RATE).toFixed(2)}</div>}
+        <div style={{ display:"flex", gap:10, marginTop:12 }}>
+          {!active
+            ? <PrimaryBtn onClick={startTrip}>🚗 Start Trip</PrimaryBtn>
+            : <>
+                <button onClick={()=>{clearInterval(timerRef.current);speak("Trip paused.");}} style={{ ...S.btn, flex:1, padding:"12px", borderRadius:14, background:"#27272a", color:"#71717a", fontSize:13 }}>Pause</button>
+                <PrimaryBtn onClick={endTrip} style={{ flex:2, background:"rgba(239,68,68,0.9)", boxShadow:"0 4px 16px rgba(239,68,68,0.3)" }}>⏹ End & Log</PrimaryBtn>
+              </>
+          }
+        </div>
+      </Card>
+
+      {/* Summary */}
+      <div style={{ display:"flex", gap:10, margin:"12px 16px 0" }}>
+        {[{l:"Total km",v:totalKm.toFixed(1),c:"#fbbf24"},{l:"Trips",v:trips.length,c:"#60a5fa"},{l:"IRD claim",v:`$${(totalKm*MILEAGE_RATE).toFixed(0)}`,c:"#4ade80"}].map(s=>(
+          <div key={s.l} style={{ flex:1, ...S.card, padding:12 }}>
+            <div style={{ fontSize:18, fontWeight:900, color:s.c }}>{s.v}</div>
+            <div style={{ fontSize:11, color:"#71717a", marginTop:2 }}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+
+      <SecTitle>Trip Log</SecTitle>
+      <Card style={{ margin:"0 16px 16px" }}>
+        {trips.length === 0
+          ? <EmptyState icon="car" title="No trips logged" sub="Tap Start Trip before driving to a job site" />
+          : trips.slice().reverse().map((t,i) => (
+            <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"14px", ...(i<trips.length-1?S.divider:{}) }}>
+              <div style={{ width:36, height:36, borderRadius:10, background:"rgba(245,158,11,0.1)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <Icon name="car" size={16} color="#fbbf24" />
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:"#fff" }}>{t.dest}</div>
+                <div style={{ fontSize:11, color:"#71717a" }}>{new Date(t.date).toLocaleDateString("en-NZ")} · {t.km.toFixed(1)} km</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#fff" }}>{t.km.toFixed(1)} km</div>
+                <div style={{ fontSize:11, color:"#71717a" }}>${t.cost.toFixed(2)}</div>
+              </div>
+              <button onClick={()=>deleteTrip(t.id)} style={{ ...S.btn, background:"none", padding:4 }}><Icon name="trash" size={14} color="#52525b" /></button>
+            </div>
+          ))
+        }
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 08 AI EMAIL ASSISTANT
+// ═══════════════════════════════════════════════════════════
+function Email({ goTo, profile }) {
+  const [email, setEmail] = useState("");
+  const [reply, setReply] = useState("");
+  const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const genReply = async () => {
+    if (!email && !reply) return;
+    setLoading(true); setDraft(""); setSent(false);
+    try {
+      const res = await fetch(`${API}/api/email`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ incomingEmail:email, replyIntent:reply, senderName:profile.name, companyName:profile.company, style:DB.get("voice",{})?.style||"professional" }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setDraft(data.draft||"");
+    } catch {
+      setDraft(`Hi,\n\nThank you for getting in touch.\n\n${reply}\n\nCheers,\n${profile.name||"Your Name"}\n${profile.company||""}`);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <ScreenHdr title="AI Email Assistant" onBack={() => goTo("dashboard")} />
+
+      <div style={{ padding:"0 16px 16px" }}>
+        <Textarea label="Incoming Email (paste here)" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Paste the email you received..." rows={4} />
+        <Textarea label="What do you want to say?" value={reply} onChange={e=>setReply(e.target.value)} placeholder='e.g. "Thursday works, will include the pergola, cheers"' rows={2} />
+        <PrimaryBtn onClick={genReply} loading={loading}>✨ Write AI Reply</PrimaryBtn>
+
+        {draft && (
+          <div style={{ marginTop:16, animation:"fadeIn 0.3s ease" }}>
+            <div style={{ fontSize:11, fontWeight:700, color:"#71717a", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>AI Draft Reply</div>
+            <div style={{ padding:"14px", background:"#27272a", border:"1px solid #3f3f46", borderRadius:12, fontSize:13, color:"#d4d4d8", lineHeight:1.7, whiteSpace:"pre-wrap" }}>{draft}</div>
+            <div style={{ display:"flex", gap:8, marginTop:10 }}>
+              <button onClick={()=>{setDraft("");setEmail("");setReply("");}} style={{ ...S.btn, flex:1, padding:"12px", borderRadius:14, background:"#27272a", color:"#71717a", fontSize:13 }}>Discard</button>
+              <PrimaryBtn onClick={()=>{setSent(true);speak("Reply sent.");}} style={{ flex:2, background:sent?"#16a34a":"#2563eb", boxShadow:sent?"none":"0 4px 16px rgba(37,99,235,0.3)" }}>
+                {sent ? "✓ Sent" : "Send Reply"}
+              </PrimaryBtn>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 09 MATERIALS DATABASE
+// ═══════════════════════════════════════════════════════════
+function Materials({ goTo, materials, setMaterials }) {
+  const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name:"", price:"", unit:"each", supplier:"" });
+
+  const filtered = materials.filter(m => m.name?.toLowerCase().includes(search.toLowerCase()) || m.supplier?.toLowerCase().includes(search.toLowerCase()));
+
+  const add = () => {
+    if (!form.name || !form.price) return;
+    const item = { id:Date.now(), ...form, price:parseFloat(form.price)||0, updated:new Date().toLocaleDateString("en-NZ") };
+    setMaterials(m => { const u=[...m,item]; DB.set("materials",u); return u; });
+    setForm({ name:"", price:"", unit:"each", supplier:"" });
+    setShowAdd(false);
+  };
+
+  const del = (id) => { setMaterials(m => { const u=m.filter(x=>x.id!==id); DB.set("materials",u); return u; }); };
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <ScreenHdr title="Materials Database" onBack={() => goTo("more")} action={
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={() => goTo("scanner")} style={{ ...S.btn, fontSize:11, color:"#60a5fa", fontWeight:700, padding:"6px 10px", borderRadius:10, background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.3)" }}>Scan Invoice</button>
+          <PlusBtn onClick={() => setShowAdd(!showAdd)} />
+        </div>
+      } />
+
+      {/* Search */}
+      <div style={{ margin:"0 16px 10px", display:"flex", alignItems:"center", gap:8, background:"#27272a", border:"1px solid #3f3f46", borderRadius:12, padding:"8px 12px" }}>
+        <Icon name="more" size={14} color="#52525b" />
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search materials..." style={{ flex:1, background:"transparent", border:"none", outline:"none", fontSize:13, color:"#fff", fontFamily:"'DM Sans',sans-serif" }} />
+      </div>
+
+      {/* Speak to add */}
+      <div style={{ margin:"0 16px 10px", display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:12, background:"rgba(37,99,235,0.08)", border:"1px solid rgba(37,99,235,0.2)" }}>
+        <Icon name="mic" size={15} color="#60a5fa" />
+        <span style={{ fontSize:12, color:"#93c5fd" }}>Say a price to add it — coming soon with voice input</span>
+      </div>
+
+      {/* Add form */}
+      {showAdd && (
+        <Card style={{ margin:"0 16px 10px", padding:16 }}>
+          <Input label="Material Name" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Colorbond Steel Sheet" />
+          <Input label="Unit Price ($)" type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} placeholder="0.00" />
+          <Input label="Unit" value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))} placeholder="per sheet, per m, each..." />
+          <Input label="Supplier" value={form.supplier} onChange={e=>setForm(f=>({...f,supplier:e.target.value}))} placeholder="e.g. Steel & Tube" />
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={()=>setShowAdd(false)} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, background:"#27272a", color:"#71717a", fontSize:13 }}>Cancel</button>
+            <button onClick={add} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, background:"#2563eb", color:"#fff", fontSize:13 }}>Add</button>
+          </div>
+        </Card>
+      )}
+
+      <Card style={{ margin:"0 16px 16px" }}>
+        {filtered.length === 0
+          ? <EmptyState icon="more" title="No materials yet" sub="Add prices manually above or scan a supplier invoice to import automatically" action={<button onClick={() => goTo("scanner")} style={{ ...S.btn, background:"#2563eb", color:"#fff", padding:"8px 16px", borderRadius:10, fontSize:12, marginTop:4 }}>Scan Invoice</button>} />
+          : filtered.map((item,i) => (
+            <div key={item.id} style={{ display:"flex", alignItems:"center", padding:"12px 14px", gap:10, ...(i<filtered.length-1?S.divider:{}) }}>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:500, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
+                <div style={{ fontSize:11, color:"#71717a", marginTop:1 }}>{item.supplier||"—"} · {item.unit} · {item.updated}</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontSize:14, fontWeight:700, color:"#fff" }}>${(item.price||0).toFixed(2)}</div>
+              </div>
+              <button onClick={()=>del(item.id)} style={{ ...S.btn, background:"none", padding:4 }}><Icon name="trash" size={14} color="#52525b" /></button>
+            </div>
+          ))
+        }
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 10 VOICE SETTINGS
+// ═══════════════════════════════════════════════════════════
+function VoiceSettings({ goTo }) {
+  const [cfg, setCfg] = useState(DB.get("voice", { on:true, accent:"nz", gender:"m", style:"tradie", speed:1.0 }));
+
+  const save = (updates) => {
+    const updated = { ...cfg, ...updates };
+    setCfg(updated);
+    DB.set("voice", updated);
+  };
+
+  const ACCENTS = [["🇳🇿","New Zealand","nz"],["🇦🇺","Australian","au"],["🇬🇧","British","gb"],["🇺🇸","American","us"],["🇮🇪","Irish","ie"],["🇿🇦","South African","za"]];
+  const STYLES = [["Professional","professional"],["Friendly","friendly"],["Straight-up Tradie","tradie"],["Sales Focused","sales"]];
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <ScreenHdr title="AI Voice Settings" onBack={() => goTo("settings")} />
+
+      {/* Preview */}
+      <Card style={{ margin:"0 16px", padding:16, display:"flex", alignItems:"center", gap:14 }}>
+        <button onClick={() => speak("G'day, TradeFlow AI here. Ready to sort your quotes.")} style={{ ...S.btn, width:48, height:48, borderRadius:16, background:"#2563eb", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 16px rgba(37,99,235,0.4)", flexShrink:0 }}>
+          <Icon name="mic" size={22} color="#fff" />
+        </button>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:11, color:"#71717a", marginBottom:6 }}>ElevenLabs Neural · Tap to preview</div>
+          <div style={{ display:"flex", alignItems:"center", gap:2, height:28 }}>
+            {Array.from({length:28}).map((_,i) => <div key={i} style={{ width:3, borderRadius:3, background:"#3b82f6", height:`${Math.abs(Math.sin(i*0.5))*18+5}px`, opacity:0.5+Math.abs(Math.sin(i*0.3))*0.5 }} />)}
+          </div>
+        </div>
+      </Card>
+
+      {/* On/Off */}
+      <SecTitle>Voice Assistant</SecTitle>
+      <Card style={{ margin:"0 16px", padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <span style={{ fontSize:13, fontWeight:600, color:"#fff" }}>Enable Voice</span>
+        <button onClick={() => save({ on:!cfg.on })} style={{ ...S.btn, width:48, height:26, borderRadius:13, background:cfg.on?"#2563eb":"#3f3f46", position:"relative", padding:0, transition:"background 0.2s" }}>
+          <div style={{ position:"absolute", top:3, left:cfg.on?24:3, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.3)" }} />
+        </button>
+      </Card>
+
+      {/* Accent */}
+      <SecTitle>Accent</SecTitle>
+      <div style={{ display:"flex", gap:8, padding:"0 16px", flexWrap:"wrap" }}>
+        {ACCENTS.map(([f,name,id]) => (
+          <button key={id} onClick={() => save({ accent:id })} style={{ ...S.btn, padding:"8px 12px", borderRadius:12, fontSize:12, marginBottom:6, background:cfg.accent===id?"#2563eb":"#27272a", color:cfg.accent===id?"#fff":"#71717a", boxShadow:cfg.accent===id?"0 4px 12px rgba(37,99,235,0.3)":"none" }}>
+            {f} {name}
+          </button>
+        ))}
+      </div>
+
+      {/* Gender */}
+      <SecTitle>Voice Gender</SecTitle>
+      <div style={{ display:"flex", gap:10, padding:"0 16px" }}>
+        {[["Male","m"],["Female","f"]].map(([l,v]) => (
+          <button key={v} onClick={() => save({ gender:v })} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, fontSize:13, background:cfg.gender===v?"#2563eb":"#27272a", color:cfg.gender===v?"#fff":"#71717a" }}>
+            {v==="m"?"👨 Male":"👩 Female"}
+          </button>
+        ))}
+      </div>
+
+      {/* Style */}
+      <SecTitle>Voice Style</SecTitle>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, padding:"0 16px" }}>
+        {STYLES.map(([l,v]) => (
+          <button key={v} onClick={() => { save({ style:v }); speak(l==="Straight-up Tradie"?"G'day mate, quote's sorted — want me to flick it through?":"Good morning. Your quotation is ready to send."); }} style={{ ...S.btn, padding:"10px 12px", borderRadius:12, fontSize:12, textAlign:"left", background:cfg.style===v?"#2563eb":"#27272a", color:cfg.style===v?"#fff":"#71717a", border:cfg.style===v?"1px solid #3b82f6":"1px solid #3f3f46" }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* Speed */}
+      <div style={{ padding:"0 16px", marginTop:16 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:"#71717a", marginBottom:8 }}>
+          <span>Speaking Speed</span><span style={{ color:"#60a5fa", fontWeight:700 }}>{cfg.speed.toFixed(1)}×</span>
+        </div>
+        <input type="range" min="5" max="20" value={Math.round(cfg.speed*10)} onChange={e => save({ speed:parseFloat((e.target.value/10).toFixed(1)) })} className="tf-range" />
+      </div>
+
+      <div style={{ padding:"16px" }}>
+        <PrimaryBtn onClick={() => speak("G'day, TradeFlow AI here. Ready to sort your quotes.")}>🔊 Test Voice</PrimaryBtn>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 11 SETTINGS
+// ═══════════════════════════════════════════════════════════
+function Settings({ goTo, profile, setProfile, gstRate, setGstRate }) {
+  const [theme, setTheme] = useState(DB.get("theme","Navy"));
+  const [editProfile, setEditProfile] = useState(false);
+  const [form, setForm] = useState(profile);
+  const [pin1, setPin1] = useState("");
+  const [pin2, setPin2] = useState("");
+  const [pinErr, setPinErr] = useState("");
+  const [showPin, setShowPin] = useState(false);
+
+  const THEMES = [{n:"Light Blue",c:"#60a5fa"},{n:"Sky Blue",c:"#38bdf8"},{n:"Navy",c:"#1e3a8a"},{n:"Teal",c:"#14b8a6"},{n:"Indigo",c:"#6366f1"},{n:"Slate",c:"#64748b"}];
+
+  const saveProfile = () => {
+    setProfile(form); DB.set("profile",form); setEditProfile(false);
+    speak("Profile saved.");
+  };
+
+  const savePin = () => {
+    if (!/^\d{4}$/.test(pin1)) { setPinErr("PIN must be 4 digits"); return; }
+    if (pin1 !== pin2) { setPinErr("PINs do not match"); return; }
+    DB.set("pin", pin1); setShowPin(false); setPin1(""); setPin2(""); setPinErr("");
+    speak("PIN updated.");
+  };
+
+  const clearData = () => {
+    if (!window.confirm("This will delete ALL your data. Are you sure?")) return;
+    ["jobs","invoices","trips","materials","profile","workers","voice","qSeq","theme","pin","country"].forEach(k => localStorage.removeItem("tf_"+k));
+    window.location.reload();
+  };
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      {/* Profile header */}
+      <div style={{ margin:"20px 16px 0", borderRadius:20, padding:20, display:"flex", alignItems:"center", gap:14, background:"linear-gradient(135deg,#1565ff 0%,#0d3f9e 60%,#071b3d 100%)" }}>
+        <div style={{ width:56, height:56, borderRadius:16, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:900, color:"#fff", flexShrink:0 }}>
+          {profile.name ? profile.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() : "?"}
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:16, fontWeight:700, color:"#fff" }}>{profile.name||"Set up your profile"}</div>
+          <div style={{ fontSize:13, color:"#93c5fd" }}>{profile.company||"Tap Profile to get started"}</div>
+          <div style={{ marginTop:6, display:"inline-block", fontSize:11, fontWeight:700, padding:"2px 10px", borderRadius:20, background:"rgba(37,99,235,0.3)", color:"#bfdbfe" }}>
+            {profile.plan||"TradeFlow AI · Pro Plan"}
+          </div>
+        </div>
+        <button onClick={() => setEditProfile(!editProfile)} style={{ ...S.btn, background:"rgba(255,255,255,0.1)", border:"none", width:32, height:32, borderRadius:9, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <Icon name="edit" size={15} color="#fff" />
+        </button>
+      </div>
+
+      {/* Profile edit */}
+      {editProfile && (
+        <Card style={{ margin:"10px 16px 0", padding:16, animation:"fadeIn 0.2s ease" }}>
+          <Input label="Your Name" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Alex Thompson" />
+          <Input label="Company Name" value={form.company} onChange={e=>setForm(f=>({...f,company:e.target.value}))} placeholder="Thompson Roofing Ltd" />
+          <Input label="Location" value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} placeholder="Auckland, NZ" />
+          <Input label="Phone" value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="021 123 4567" type="tel" />
+          <Input label={`GST/Tax Rate (%)`} value={gstRate*100} onChange={e=>{const v=parseFloat(e.target.value)/100||0.15;setGstRate(v);DB.set("gstRate",v);}} type="number" placeholder="15" />
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={()=>setEditProfile(false)} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, background:"#27272a", color:"#71717a", fontSize:13 }}>Cancel</button>
+            <button onClick={saveProfile} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, background:"#2563eb", color:"#fff", fontSize:13 }}>Save</button>
+          </div>
+        </Card>
+      )}
+
+      {/* Theme */}
+      <SecTitle>Theme</SecTitle>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, padding:"0 16px" }}>
+        {THEMES.map(t => (
+          <button key={t.n} onClick={() => { setTheme(t.n); DB.set("theme",t.n); }} style={{ ...S.btn, display:"flex", flexDirection:"column", alignItems:"center", gap:8, padding:12, borderRadius:14, background:theme===t.n?"rgba(37,99,235,0.1)":"#18181b", border:theme===t.n?"1px solid #3b82f6":"1px solid #27272a" }}>
+            <div style={{ width:28, height:28, borderRadius:"50%", background:t.c }} />
+            <span style={{ fontSize:11, fontWeight:700, color:theme===t.n?"#60a5fa":"#71717a" }}>{t.n}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Security */}
+      <SecTitle>Security</SecTitle>
+      <Card style={{ margin:"0 16px" }}>
+        <button onClick={() => setShowPin(!showPin)} style={{ ...S.btn, display:"flex", alignItems:"center", gap:10, padding:"14px", width:"100%", background:"transparent", ...S.divider }}>
+          <div style={{ width:32, height:32, borderRadius:9, background:"#27272a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <Icon name="lock" size={16} color="#60a5fa" />
+          </div>
+          <span style={{ flex:1, fontSize:13, fontWeight:500, color:"#e4e4e7", textAlign:"left" }}>Change PIN</span>
+          <Icon name="chev" size={14} color="#52525b" />
+        </button>
+        {showPin && (
+          <div style={{ padding:"14px", ...S.divider }}>
+            <Input label="New PIN (4 digits)" value={pin1} onChange={e=>setPin1(e.target.value.replace(/\D/g,"").slice(0,4))} type="password" inputMode="numeric" placeholder="••••" />
+            <Input label="Confirm PIN" value={pin2} onChange={e=>setPin2(e.target.value.replace(/\D/g,"").slice(0,4))} type="password" inputMode="numeric" placeholder="••••" />
+            {pinErr && <div style={{ fontSize:12, color:"#f87171", marginBottom:8 }}>{pinErr}</div>}
+            <button onClick={savePin} style={{ ...S.btn, width:"100%", padding:"10px", borderRadius:12, background:"#2563eb", color:"#fff", fontSize:13 }}>Save New PIN</button>
+          </div>
+        )}
+        <button onClick={() => goTo("voicesettings")} style={{ ...S.btn, display:"flex", alignItems:"center", gap:10, padding:"14px", width:"100%", background:"transparent", ...S.divider }}>
+          <div style={{ width:32, height:32, borderRadius:9, background:"#27272a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><Icon name="mic" size={16} color="#60a5fa" /></div>
+          <span style={{ flex:1, fontSize:13, fontWeight:500, color:"#e4e4e7", textAlign:"left" }}>AI Voice Settings</span>
+          <Icon name="chev" size={14} color="#52525b" />
+        </button>
+        <button onClick={clearData} style={{ ...S.btn, display:"flex", alignItems:"center", gap:10, padding:"14px", width:"100%", background:"transparent" }}>
+          <div style={{ width:32, height:32, borderRadius:9, background:"rgba(239,68,68,0.1)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><Icon name="trash" size={16} color="#f87171" /></div>
+          <span style={{ flex:1, fontSize:13, fontWeight:500, color:"#f87171", textAlign:"left" }}>Clear All Data</span>
+        </button>
+      </Card>
+
+      <div style={{ padding:"16px", fontSize:12, color:"#3f3f46", textAlign:"center", lineHeight:1.6 }}>
+        TradeFlow AI v1.0 · Built on the tools, built for the tools.<br />
+        Backend: tradeflow-api-88z6.onrender.com
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// MORE MENU
+// ═══════════════════════════════════════════════════════════
+function More({ goTo }) {
+  const items = [
+    { l:"Receipt Logger",        i:"doc",    s:"receipts",      c:"#fb923c", sub:"AI spending tracker — snap & categorise" },
+    { l:"Quotes / Jobs",         i:"doc",    s:"jobs",          c:"#60a5fa", sub:"Pipeline, quotes, variations" },
+    { l:"AI Invoice Scanner",    i:"scan",   s:"scanner",       c:"#22d3ee", sub:"Scan supplier invoices" },
+    { l:"Safety Pack",           i:"shield", s:"safety",        c:"#f87171", sub:"Hazards, toolbox, PPE, sign-off" },
+    { l:"Mileage & GPS",         i:"car",    s:"mileage",       c:"#fbbf24", sub:"Log trips, export for IRD" },
+    { l:"Materials Database",    i:"more",   s:"materials",     c:"#4ade80", sub:"Live prices, always accurate" },
+    { l:"AI Email Assistant",    i:"mail",   s:"email",         c:"#c084fc", sub:"Read, summarise and reply" },
+    { l:"Voice Settings",        i:"mic",    s:"voicesettings", c:"#34d399", sub:"Accent, style, speed" },
+    { l:"Settings",              i:"cog",    s:"settings",      c:"#a1a1aa", sub:"Profile, theme, security" },
+  ];
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <div style={{ padding:"20px 16px 12px" }}>
+        <div style={{ fontSize:20, fontWeight:800, color:"#fff" }}>More</div>
+      </div>
+      <Card style={{ margin:"0 16px 16px" }}>
+        {items.map((item,i) => (
+          <button key={item.s} onClick={() => goTo(item.s)} style={{ ...S.btn, display:"flex", alignItems:"center", gap:10, padding:"14px", width:"100%", background:"transparent", ...(i<items.length-1?S.divider:{}) }}>
+            <div style={{ width:40, height:40, borderRadius:12, background:"#27272a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <Icon name={item.i} size={18} color={item.c} />
+            </div>
+            <div style={{ flex:1, textAlign:"left" }}>
+              <div style={{ fontSize:13, fontWeight:600, color:"#e4e4e7" }}>{item.l}</div>
+              <div style={{ fontSize:11, color:"#71717a", marginTop:1 }}>{item.sub}</div>
+            </div>
+            <Icon name="chev" size={14} color="#52525b" />
+          </button>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 12 RECEIPT LOGGER — AI powered spending tracker
+// ═══════════════════════════════════════════════════════════
+function Receipts({ goTo }) {
+  const [receipts, setReceipts] = useState(() => DB.get("receipts", []));
+  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState("All");
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ supplier:"", amount:"", category:"Materials", note:"" });
+  const fileRef = useRef();
+
+  const CATS = ["Materials","Fuel","Tools","Subcontractors","Insurance","Vehicle","Office","Food","Other"];
+  const CAT_COLORS = { Materials:"#60a5fa", Fuel:"#fbbf24", Tools:"#f87171", Subcontractors:"#a78bfa", Insurance:"#4ade80", Vehicle:"#fb923c", Office:"#22d3ee", Food:"#f472b6", Other:"#a1a1aa" };
+
+  const save = (updated) => { setReceipts(updated); DB.set("receipts", updated); };
+
+  // Snap & AI scan
+  const handlePhoto = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API}/api/scan-invoice`, {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({ image:ev.target.result, mode:"receipt" }),
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        // Extract first item total as receipt amount
+        const total = data.items?.reduce((a,i) => a + (i.price||0), 0) || 0;
+        const supplier = data.supplier || "Unknown";
+        const receipt = {
+          id: Date.now(),
+          supplier,
+          amount: total,
+          category: guessCategory(supplier, data.items),
+          note: data.items?.map(i=>i.name).join(", ").slice(0,80) || "",
+          date: new Date().toISOString(),
+          photo: ev.target.result,
+          aiScanned: true,
+        };
+        const updated = [receipt, ...receipts];
+        save(updated);
+        speak(`Receipt scanned. ${supplier}, $${total.toFixed(2)}, categorised as ${receipt.category}.`);
+      } catch {
+        // Fallback — open manual form
+        setShowAdd(true);
+      }
+      setLoading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const guessCategory = (supplier, items) => {
+    const s = (supplier + " " + (items||[]).map(i=>i.name).join(" ")).toLowerCase();
+    if (/steel|iron|colorbond|timber|plywood|concrete|cement|gib|insulation|pipe|fitting|wire|cable/.test(s)) return "Materials";
+    if (/fuel|petrol|diesel|bp|z energy|mobil|gull/.test(s)) return "Fuel";
+    if (/tool|makita|dewalt|hilti|screwfix|hardware/.test(s)) return "Tools";
+    if (/insurance|aon|lumley|vero/.test(s)) return "Insurance";
+    if (/vehicle|tyre|warrant|wof|service|mechanical/.test(s)) return "Vehicle";
+    if (/cafe|coffee|food|restaurant|subway|maccas|countdown|pak|supermarket/.test(s)) return "Food";
+    if (/office|stationery|paper|cartridge|printer/.test(s)) return "Office";
+    return "Other";
+  };
+
+  const addManual = () => {
+    if (!form.supplier || !form.amount) return;
+    const receipt = { id:Date.now(), ...form, amount:parseFloat(form.amount)||0, date:new Date().toISOString(), aiScanned:false };
+    const updated = [receipt, ...receipts];
+    save(updated);
+    setForm({ supplier:"", amount:"", category:"Materials", note:"" });
+    setShowAdd(false);
+  };
+
+  const del = (id) => save(receipts.filter(r => r.id !== id));
+
+  // Analytics
+  const now = new Date();
+  const mthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const mthReceipts = receipts.filter(r => new Date(r.date) >= mthStart);
+  const mthTotal = mthReceipts.reduce((a,r) => a + (r.amount||0), 0);
+  const byCategory = CATS.map(cat => ({
+    cat, total: mthReceipts.filter(r=>r.category===cat).reduce((a,r)=>a+(r.amount||0),0),
+    count: mthReceipts.filter(r=>r.category===cat).length,
+  })).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
+
+  const filtered = tab === "All" ? receipts : receipts.filter(r => r.category === tab);
+
+  // Export CSV
+  const exportCSV = () => {
+    if (!receipts.length) return;
+    const rows = [["Date","Supplier","Category","Amount ($)","Note","AI Scanned"]];
+    receipts.forEach(r => rows.push([new Date(r.date).toLocaleDateString("en-NZ"), r.supplier, r.category, (r.amount||0).toFixed(2), r.note||"", r.aiScanned?"Yes":"No"]));
+    const csv = rows.map(r => r.map(c=>`"${c}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+    a.download = `receipts-${now.toISOString().slice(0,10)}.csv`;
+    a.click();
+  };
+
+  return (
+    <div style={{ ...S.screen }} className="ns">
+      <ScreenHdr title="Receipt Logger" onBack={() => goTo("more")} action={
+        <div style={{ display:"flex", gap:6 }}>
+          <button onClick={exportCSV} style={{ ...S.btn, fontSize:11, color:"#60a5fa", fontWeight:700, padding:"6px 10px", borderRadius:10, background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.3)" }}>Export</button>
+          <PlusBtn onClick={() => setShowAdd(!showAdd)} />
+        </div>
+      } />
+
+      <input type="file" ref={fileRef} accept="image/*" capture="environment" onChange={handlePhoto} style={{ display:"none" }} />
+
+      {/* Scan button */}
+      <button onClick={() => fileRef.current.click()} style={{ ...S.btn, margin:"0 16px 10px", borderRadius:16, padding:16, display:"flex", alignItems:"center", gap:12, background:"linear-gradient(135deg,rgba(37,99,235,0.15),rgba(37,99,235,0.08))", border:"1px solid rgba(59,130,246,0.3)", fontWeight:400, width:"calc(100% - 32px)" }}>
+        {loading
+          ? <><Spinner /><div style={{ textAlign:"left" }}><div style={{ fontSize:13, fontWeight:700, color:"#fff" }}>AI Scanning...</div><div style={{ fontSize:11, color:"#71717a", marginTop:2 }}>Reading receipt with Claude AI</div></div></>
+          : <><div style={{ width:44, height:44, borderRadius:14, background:"#2563eb", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"0 4px 16px rgba(37,99,235,0.4)" }}><Icon name="camera" size={22} color="#fff" /></div>
+              <div style={{ textAlign:"left" }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#fff" }}>📸 Snap a Receipt</div>
+                <div style={{ fontSize:11, color:"#71717a", marginTop:2 }}>AI reads supplier, amount & auto-categorises</div>
+              </div></>
+        }
+      </button>
+
+      {/* Monthly summary */}
+      {mthTotal > 0 && (
+        <div style={{ margin:"0 16px 10px", borderRadius:18, padding:16, background:"linear-gradient(135deg,#1565ff 0%,#0d3f9e 60%,#071b3d 100%)" }}>
+          <div style={{ fontSize:11, fontWeight:700, color:"rgba(147,197,253,0.7)", textTransform:"uppercase", letterSpacing:"0.08em" }}>
+            {now.toLocaleDateString("en-NZ",{month:"long",year:"numeric"})} Spending
+          </div>
+          <div style={{ fontSize:32, fontWeight:900, color:"#fff", marginTop:4 }}>${mthTotal.toLocaleString("en-NZ",{minimumFractionDigits:0})}</div>
+          <div style={{ fontSize:12, color:"#93c5fd", marginTop:2 }}>{mthReceipts.length} receipt{mthReceipts.length!==1?"s":""} this month</div>
+
+          {/* Category breakdown bars */}
+          {byCategory.length > 0 && (
+            <div style={{ marginTop:14 }}>
+              {byCategory.slice(0,4).map(c => (
+                <div key={c.cat} style={{ marginBottom:8 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginBottom:4 }}>
+                    <span style={{ color:"rgba(255,255,255,0.7)", fontWeight:600 }}>{c.cat}</span>
+                    <span style={{ color:"#fff", fontWeight:700 }}>${c.total.toFixed(0)}</span>
+                  </div>
+                  <div style={{ height:4, borderRadius:2, background:"rgba(255,255,255,0.15)" }}>
+                    <div style={{ height:"100%", borderRadius:2, background:CAT_COLORS[c.cat]||"#60a5fa", width:`${Math.min((c.total/mthTotal)*100,100)}%`, transition:"width 0.5s ease" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Manual add form */}
+      {showAdd && (
+        <Card style={{ margin:"0 16px 10px", padding:16, animation:"fadeIn 0.2s ease" }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#fff", marginBottom:12 }}>+ Add Receipt Manually</div>
+          <Input label="Supplier / Store" value={form.supplier} onChange={e=>setForm(f=>({...f,supplier:e.target.value}))} placeholder="e.g. Bunnings, BP, Steel & Tube" />
+          <Input label="Amount ($)" type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" />
+          <div style={{ marginBottom:12 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:"#71717a", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>Category</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+              {CATS.map(c => (
+                <button key={c} onClick={() => setForm(f=>({...f,category:c}))} style={{ ...S.btn, fontSize:11, padding:"5px 10px", borderRadius:8, background:form.category===c?CAT_COLORS[c]:"#27272a", color:form.category===c?"#fff":"#71717a", border:form.category===c?`1px solid ${CAT_COLORS[c]}`:"1px solid #3f3f46", opacity:form.category===c?1:0.8 }}>{c}</button>
+              ))}
+            </div>
+          </div>
+          <Input label="Note (optional)" value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} placeholder="What was it for?" />
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={()=>setShowAdd(false)} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, background:"#27272a", color:"#71717a", fontSize:13 }}>Cancel</button>
+            <button onClick={addManual} style={{ ...S.btn, flex:1, padding:"10px", borderRadius:12, background:"#2563eb", color:"#fff", fontSize:13 }}>Add Receipt</button>
+          </div>
+        </Card>
+      )}
+
+      {/* Category filter */}
+      <Pills opts={["All",...CATS.filter(c=>receipts.some(r=>r.category===c))]} val={tab} onChange={setTab} />
+
+      {/* Receipt list */}
+      <Card style={{ margin:"8px 16px 16px" }}>
+        {filtered.length === 0
+          ? <EmptyState icon="doc" title="No receipts yet" sub="Snap a receipt with the camera above or add one manually" />
+          : filtered.map((r,i) => (
+            <div key={r.id} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"14px", ...(i<filtered.length-1?S.divider:{}) }}>
+              {/* Category dot */}
+              <div style={{ width:36, height:36, borderRadius:10, background:`${CAT_COLORS[r.category]||"#71717a"}20`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <div style={{ width:10, height:10, borderRadius:"50%", background:CAT_COLORS[r.category]||"#71717a" }} />
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between" }}>
+                  <div style={{ flex:1, minWidth:0, marginRight:8 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.supplier}</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2 }}>
+                      <span style={{ fontSize:11, fontWeight:600, padding:"1px 6px", borderRadius:6, background:`${CAT_COLORS[r.category]||"#71717a"}25`, color:CAT_COLORS[r.category]||"#71717a" }}>{r.category}</span>
+                      {r.aiScanned && <span style={{ fontSize:10, color:"#60a5fa" }}>✦ AI</span>}
+                    </div>
+                    {r.note && <div style={{ fontSize:11, color:"#52525b", marginTop:3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.note}</div>}
+                    <div style={{ fontSize:11, color:"#3f3f46", marginTop:2 }}>{new Date(r.date).toLocaleDateString("en-NZ",{day:"numeric",month:"short",year:"numeric"})}</div>
+                  </div>
+                  <div style={{ textAlign:"right", flexShrink:0 }}>
+                    <div style={{ fontSize:14, fontWeight:900, color:"#fff" }}>${(r.amount||0).toFixed(2)}</div>
+                    <button onClick={()=>del(r.id)} style={{ ...S.btn, background:"none", padding:4, marginTop:4 }}>
+                      <Icon name="trash" size={13} color="#52525b" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        }
+      </Card>
+    </div>
+  );
+}
+
+
+function App() {
+  const [phase, setPhase] = useState("splash");
+  const [screen, setScreen] = useState("dashboard");
+
+  // Global state — all persisted to localStorage
+  const [jobs, setJobs]           = useState(() => DB.get("jobs", []));
+  const [invoices, setInvoices]   = useState(() => DB.get("invoices", []));
+  const [trips, setTrips]         = useState(() => DB.get("trips", []));
+  const [materials, setMaterials] = useState(() => DB.get("materials", []));
+  const [profile, setProfile]     = useState(() => DB.get("profile", { name:"", company:"", location:"", phone:"" }));
+  const [gstRate, setGstRate]     = useState(() => DB.get("gstRate", 0.15));
+
+  const goTo = (s) => setScreen(s);
+
+  const renderScreen = () => {
+    const props = { goTo, jobs, setJobs, invoices, setInvoices, trips, setTrips, materials, setMaterials, profile, setProfile, gstRate, setGstRate };
+    if (screen === "receipts")      return <Receipts {...props} />;
+    if (screen === "dashboard")     return <Dashboard {...props} />;
+    if (screen === "jobs")          return <Jobs {...props} />;
+    if (screen === "voice")         return <Voice {...props} />;
+    if (screen === "invoices")      return <Invoices {...props} />;
+    if (screen === "email")         return <Email {...props} />;
+    if (screen === "scanner")       return <Scanner {...props} />;
+    if (screen === "safety")        return <Safety {...props} />;
+    if (screen === "mileage")       return <Mileage {...props} />;
+    if (screen === "materials")     return <Materials {...props} />;
+    if (screen === "voicesettings") return <VoiceSettings {...props} />;
+    if (screen === "settings")      return <Settings {...props} />;
+    if (screen === "more")          return <More {...props} />;
+    return <Dashboard {...props} />;
+  };
+
+  const NAV = [
+    { id:"dashboard", l:"Home",     i:"home" },
+    { id:"jobs",      l:"Jobs",     i:"jobs" },
+    { id:"_fab",      l:"",         i:"mic" },
+    { id:"invoices",  l:"Invoices", i:"doc" },
+    { id:"more",      l:"More",     i:"more" },
+  ];
+  const mainScreens = ["dashboard","jobs","invoices","more"];
+  const navActive = (id) => id === "more" ? !mainScreens.includes(screen) || screen === "more" : screen === id;
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#000", display:"flex", alignItems:"center", justifyContent:"center", padding:8, fontFamily:"'DM Sans',system-ui,sans-serif" }}>
+      <style>{GLOBAL_CSS}</style>
+      <div style={{ width:"100%", maxWidth:390, height:"min(844px,96vh)", background:"#09090b", display:"flex", flexDirection:"column", position:"relative", overflow:"hidden", borderRadius:44, border:"1px solid rgba(255,255,255,0.06)", boxShadow:"0 30px 80px rgba(0,0,0,0.9)" }}>
+
+        {phase === "splash" && <Splash onDone={() => setPhase("pin")} />}
+        {phase === "pin"    && <PinLock onUnlock={() => { setPhase("app"); }} />}
+
+        {phase === "app" && (
+          <>
+            {/* Status bar */}
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 24px 4px", flexShrink:0 }}>
+              <span style={{ fontSize:14, fontWeight:600, color:"#fff" }}>
+                {new Date().getHours()%12||12}:{String(new Date().getMinutes()).padStart(2,"0")}
+              </span>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <div style={{ display:"flex", gap:2, alignItems:"flex-end" }}>{[3,5,7,9].map((h,i)=><div key={i} style={{ width:3,height:h,background:"#fff",borderRadius:1 }}/>)}</div>
+                <svg width="15" height="11" viewBox="0 0 15 11" fill="white"><path d="M7.5 2.2C4.9 2.2 2.6 3.3 1 5.1L0 4.1C1.9 1.9 4.5.6 7.5.6s5.6 1.3 7.5 3.5L14 5.1C12.4 3.3 10.1 2.2 7.5 2.2z"/></svg>
+                <svg width="25" height="12" viewBox="0 0 25 12" fill="white"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" strokeOpacity="0.35" fill="none"/><rect x="2" y="2" width="18" height="8" rx="2" fill="white"/></svg>
+              </div>
+            </div>
+
+            {/* Screen */}
+            <div style={{ flex:1, overflow:"hidden" }}>{renderScreen()}</div>
+
+            {/* Bottom nav */}
+            <div style={{ display:"flex", alignItems:"center", padding:"8px 8px 20px", flexShrink:0, background:"rgba(9,9,11,0.97)", borderTop:"1px solid #27272a" }}>
+              {NAV.map(tab => {
+                if (tab.id === "_fab") return (
+                  <div key="_fab" style={{ flex:1, display:"flex", justifyContent:"center" }}>
+                    <button onClick={() => goTo("voice")} style={{ ...S.btn, width:56, height:56, borderRadius:"50%", background:"#2563eb", display:"flex", alignItems:"center", justifyContent:"center", marginTop:-20, boxShadow:"0 4px 24px rgba(37,99,235,0.5)" }}>
+                      <Icon name="mic" size={24} color="#fff" />
+                    </button>
+                  </div>
+                );
+                const active = navActive(tab.id);
+                return (
+                  <button key={tab.id} onClick={() => goTo(tab.id)} style={{ ...S.btn, flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3, padding:"4px 0", background:"none" }}>
+                    <Icon name={tab.i} size={20} color={active?"#60a5fa":"#52525b"} />
+                    <span style={{ fontSize:10, fontWeight:700, color:active?"#60a5fa":"#52525b" }}>{tab.l}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>

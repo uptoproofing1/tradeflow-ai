@@ -2780,6 +2780,16 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
       <span style="color:var(--t3);font-style:italic;font-size:12px;">Tap mic and tell me what you need</span>
     </div>
 
+    <!-- Type-instead fallback — works with no mic, on noisy/no-signal sites, and for non-speaking users -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <input id="ai-text-input" type="text" inputmode="text" autocomplete="off"
+        placeholder="…or type what you need"
+        aria-label="Type your request for the AI assistant"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();aiSubmitTyped();}"
+        style="flex:1;min-width:0;padding:12px 14px;border-radius:10px;border:1px solid var(--bdr);background:var(--bg);color:var(--t);font-size:14px;outline:none;font-family:'DM Sans',sans-serif;">
+      <button class="btn btn-p" style="width:auto;flex:0 0 auto;padding:12px 16px;" onclick="aiSubmitTyped()">Send</button>
+    </div>
+
     <!-- Response/action -->
     <div id="ai-response" style="display:none;padding:12px 14px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;font-size:13px;color:#4ade80;margin-bottom:12px;"></div>
 
@@ -3789,6 +3799,8 @@ function aiCloseModal(){
   if(resp) resp.style.display='none';
   const sub = document.getElementById('ai-submit-btn');
   if(sub) sub.style.display='none';
+  const ti = document.getElementById('ai-text-input');
+  if(ti) ti.value='';
 }
 
 function aiToggleListen(){
@@ -4044,9 +4056,25 @@ async function aiScopeFromVoice(){
   }
 }
 
+// Typed path — same pipeline as voice. Lets the assistant work on noisy/no-signal
+// sites and for people who can't or don't want to speak aloud.
+function aiSubmitTyped(){
+  const inp = document.getElementById('ai-text-input');
+  const txt = inp ? inp.value.trim() : '';
+  if(txt.length < 3){
+    alert('Type what you need — e.g. "create an estimate for 20m of pine framing for John Smith".');
+    if(inp) inp.focus();
+    return;
+  }
+  if(aiListening) aiStopListen();   // stop the mic if it happened to be running
+  aiTranscript = txt;
+  if(inp) inp.value='';
+  aiProcessText();
+}
+
 async function aiProcessText(){
   if(!aiTranscript || aiTranscript.length < 3){
-    alert('Please speak your command first.');
+    alert('Tap the mic and speak, or type your request below.');
     return;
   }
   const resp = document.getElementById('ai-response');

@@ -2523,6 +2523,17 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
         <span class="sv2" id="gst-display">15%</span>
         <svg class="sarr" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
       </div>
+      <div class="set-row" onclick="backupData()">
+        <div class="si" style="background:#dcfce7;"><svg viewBox="0 0 24 24" style="fill:#16a34a;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></div>
+        <div style="flex:1;"><div class="sl2">Back Up My Data</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">Save a password-protected backup file</div></div>
+        <svg class="sarr" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+      <div class="set-row" onclick="restoreDataPrompt()">
+        <div class="si" style="background:#dbeafe;"><svg viewBox="0 0 24 24" style="fill:#2563eb;"><path d="M5 15h4v6h6v-6h4l-7-7-7 7zM5 4v2h14V4H5z"/></svg></div>
+        <div style="flex:1;"><div class="sl2">Restore From Backup</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">Load a backup file onto this device</div></div>
+        <svg class="sarr" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+      <input type="file" id="restore-file-input" accept=".json,application/json" style="display:none;" onchange="restoreDataFile(event)">
       <div class="set-row" onclick="clearAllData()">
         <div class="si" style="background:#fee2e2;"><svg viewBox="0 0 24 24" style="fill:#dc2626;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
         <span class="sl2" style="color:var(--err);">Clear All Data</span>
@@ -9512,7 +9523,117 @@ function clearAllData(){
   jobs=[]; materials=[]; trips=[]; invoices=[];
   DB.set('jobs',[]); DB.set('materials',[]); DB.set('trips',[]); DB.set('invoices',[]);
   qSeq=1; DB.set('qSeq',1);
-  initDash(); 
+  initDash();
+}
+
+// ═══════════════════════════════════════════════════════════
+// ENCRYPTED BACKUP / RESTORE  (Web Crypto AES-GCM, passphrase-derived key)
+// Real encryption: PBKDF2-SHA-256 (600k) -> AES-GCM 256. Random salt + IV per
+// file. Passphrase is never stored. Wrong passphrase fails closed (GCM auth tag).
+// ═══════════════════════════════════════════════════════════
+const BACKUP_PBKDF2_ITERS = 600000;
+function _b64(buf){ return btoa(String.fromCharCode.apply(null, new Uint8Array(buf))); }
+function _unb64(s){ return Uint8Array.from(atob(s), function(c){ return c.charCodeAt(0); }); }
+
+async function _backupDeriveKey(passphrase, salt, usages){
+  const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt: salt, iterations: BACKUP_PBKDF2_ITERS, hash:'SHA-256' },
+    baseKey, { name:'AES-GCM', length:256 }, false, usages || ['encrypt','decrypt']
+  );
+}
+
+// Every QuotaFlo localStorage key (tf_*) EXCEPT device-only PIN/auth tokens,
+// which shouldn't travel in a portable backup.
+function _collectBackupData(){
+  const SKIP = ['tf_pin','tf_authToken','tf_refreshToken','tf_lock_time'];
+  const out = {};
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.indexOf('tf_')===0 && SKIP.indexOf(k)===-1){ out[k] = localStorage.getItem(k); }
+  }
+  return out;
+}
+
+async function backupData(){
+  try{
+    if(!(window.crypto && crypto.subtle)){ alert('Backup needs a secure (https) connection. Open the app from its web address and try again.'); return; }
+    const pass = prompt('Choose a password to protect this backup file.\n\nYou will need this exact password to restore it. Write it down somewhere safe — we cannot recover it for you.');
+    if(pass===null) return;
+    if(pass.length < 6){ alert('Please use a password of at least 6 characters.'); return; }
+    const pass2 = prompt('Re-enter the same password to confirm.');
+    if(pass2===null) return;
+    if(pass !== pass2){ alert('The passwords did not match. Backup cancelled — please try again.'); return; }
+
+    const payload = JSON.stringify({ data: _collectBackupData(), savedAt: new Date().toISOString() });
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const key  = await _backupDeriveKey(pass, salt, ['encrypt']);
+    const ct   = await crypto.subtle.encrypt({ name:'AES-GCM', iv: iv }, key, new TextEncoder().encode(payload));
+
+    const file = {
+      app:'QuotaFlo', type:'quotaflo-backup', version:1,
+      kdf:{ name:'PBKDF2', hash:'SHA-256', iterations: BACKUP_PBKDF2_ITERS }, cipher:'AES-GCM',
+      salt:_b64(salt), iv:_b64(iv), ciphertext:_b64(ct)
+    };
+    const blob = new Blob([JSON.stringify(file)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'quotaflo-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    alert('✅ Backup saved.\n\nKeep the file somewhere safe (email it to yourself, or save to cloud storage). You will need your password to restore it.');
+  }catch(e){
+    alert('Sorry — the backup could not be created. ' + (e && e.message ? e.message : ''));
+  }
+}
+
+function restoreDataPrompt(){
+  const inp = document.getElementById('restore-file-input');
+  if(inp){ inp.value=''; inp.click(); }
+}
+
+async function restoreDataFile(event){
+  const file = event && event.target && event.target.files && event.target.files[0];
+  if(!file) return;
+  try{
+    if(!(window.crypto && crypto.subtle)){ alert('Restore needs a secure (https) connection. Open the app from its web address and try again.'); return; }
+    const text = await file.text();
+    let parsed;
+    try{ parsed = JSON.parse(text); }catch(e){ alert('That file is not a valid QuotaFlo backup.'); return; }
+    if(!parsed || parsed.type !== 'quotaflo-backup' || !parsed.ciphertext){ alert('That file is not a QuotaFlo backup.'); return; }
+
+    const pass = prompt('Enter the password for this backup file.');
+    if(pass===null) return;
+
+    let plain;
+    try{
+      const salt = _unb64(parsed.salt), iv = _unb64(parsed.iv), ct = _unb64(parsed.ciphertext);
+      const iters = (parsed.kdf && parsed.kdf.iterations) || BACKUP_PBKDF2_ITERS;
+      const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+      const key = await crypto.subtle.deriveKey({ name:'PBKDF2', salt: salt, iterations: iters, hash:'SHA-256' }, baseKey, { name:'AES-GCM', length:256 }, false, ['decrypt']);
+      const buf = await crypto.subtle.decrypt({ name:'AES-GCM', iv: iv }, key, ct);
+      plain = new TextDecoder().decode(buf);
+    }catch(e){
+      alert('Could not open the backup — the password may be wrong, or the file is damaged. Nothing on this device was changed.');
+      return;
+    }
+
+    let obj;
+    try{ obj = JSON.parse(plain); }catch(e){ alert('The backup contents were unreadable. Nothing was changed.'); return; }
+    const data = obj && obj.data;
+    if(!data || typeof data!=='object'){ alert('The backup had no data to restore. Nothing was changed.'); return; }
+
+    const count = Object.keys(data).length;
+    const when = obj.savedAt ? (' from ' + new Date(obj.savedAt).toLocaleString('en-NZ')) : '';
+    if(!confirm('Restore this backup' + when + '?\n\nThis REPLACES the jobs, clients, quotes, invoices, materials and settings on this device with the ones in the backup ('+count+' items). This cannot be undone.\n\nYour PIN and login stay as they are.')) return;
+
+    Object.keys(data).forEach(function(k){ try{ localStorage.setItem(k, data[k]); }catch(e){} });
+    alert('✅ Restore complete. The app will now reload with your restored data.');
+    location.reload();
+  }catch(e){
+    alert('Sorry — the restore could not be completed. ' + (e && e.message ? e.message : '') + '\nNothing was changed.');
+  }
 }
 
 async function doLogout(){

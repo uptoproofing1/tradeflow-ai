@@ -3547,16 +3547,6 @@ function unlockApp() {
     setTimeout(showJessFab, 600);
   }, 300);
   resetAutoLock();
-  const name = profile.name ? ', '+profile.name.split(' ')[0] : '';
-  // One-time nudge: if still on the default PIN, encourage changing it
-  if(getPin() === '1234' && !DB.get('pinNudged', false)){
-    DB.set('pinNudged', true);
-    setTimeout(function(){
-      if(confirm('🔐 You\u2019re still using the default PIN (1234).\n\nFor your security, set your own PIN now? It protects all your customer data, quotes and invoices.')){
-        if(typeof show === 'function') show('pin-modal');
-      }
-    }, 1200);
-  }
 }
 
 function lockNow() {

@@ -6559,6 +6559,10 @@ function toggleP(h){
 
 // ── Backend URL ───────────────────────────────────────────
 const API = 'https://tradeflow-api-88z6.onrender.com';
+// Wake the Render backend early. The free tier sleeps after ~15 min idle, so the
+// first AI call could take 30-60s and make the (working) backend feel disconnected.
+// This fire-and-forget ping warms the server on load so the first action is fast.
+(function warmUpBackend(){ try{ fetch(API + '/', { method:'GET', mode:'no-cors', cache:'no-store' }).catch(function(){}); }catch(e){} })();
 
 // ── Voice options ─────────────────────────────────────────
 const VOICE_OPTIONS = [

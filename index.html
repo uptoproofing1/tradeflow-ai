@@ -3704,6 +3704,35 @@ let selCtry   = null; // set from COUNTRIES after definition
 
 function save(){ DB.set('jobs',jobs); DB.set('materials',materials); DB.set('trips',trips); DB.set('invoices',invoices); DB.set('quotes',quotes); DB.set('clients',clients); DB.set('profile',profile); DB.set('settings',settings); DB.set('qSeq',qSeq); }
 
+// Give brand-new users an editable starter price list so the very first voice
+// estimate produces a priced quote — no need to hand-build the whole list first.
+// Runs once ever (flagged), and never overwrites a list that already has items.
+function seedStarterMaterials(){
+  try{
+    if(DB.get('seededStarter')) return;
+    if(materials && materials.length){ DB.set('seededStarter', true); return; }
+    const now = Date.now();
+    const starter = [
+      ['Colorsteel roofing', 26, 'm²'],
+      ['Roofing underlay', 4.5, 'm²'],
+      ['Timber framing 90x45', 7.5, 'm'],
+      ['H3.2 treated pine 100x50', 9.5, 'm'],
+      ['Roofing screws', 28, 'box'],
+      ['Spouting / gutter', 18, 'm'],
+      ['Downpipe', 12, 'm'],
+      ['Flashing', 22, 'm'],
+      ['Skip bin / waste disposal', 280, 'each'],
+      ['Scaffold hire', 350, 'week'],
+      ['Labour — general', 75, 'hour']
+    ];
+    starter.forEach(function(s,i){
+      materials.push({ id:'seed'+now+i, name:s[0], price:s[1], unit:s[2], supplier:'Example — edit or delete', example:true, updated:now });
+    });
+    DB.set('seededStarter', true);
+    save();
+  }catch(e){ /* seeding is best-effort; never block signup */ }
+}
+
 // ── Financial Year helpers (NZ: 1 Apr to 31 Mar) ──
 function getCurrentFY(offsetYears = 0){
   const now = new Date();
@@ -10559,6 +10588,7 @@ function showAuthScreen(){
       
       if(name){ profile.name = name; }
       if(company){ profile.company = company; }
+      seedStarterMaterials();   // starter price list so the first voice estimate works immediately
       save();
 
       overlay.remove();

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="index,follow">
+<title>Privacy Policy — QuotaFlo AI</title>
+<meta name="description" content="Privacy Policy for QuotaFlo AI — how Up Top Technologies collects, uses and shares information in the QuotaFlo AI app and website.">
+<style>
+  :root{ --bg:#0f1115; --card:#171a21; --t:#e8eaed; --t2:#b6bcc6; --t3:#8a909c; --accent:#f59e0b; --line:#272b34; }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{ margin:0; background:var(--bg); color:var(--t); font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .wrap{ max-width:760px; margin:0 auto; padding:28px 20px 80px; }
+  header{ border-bottom:1px solid var(--line); padding-bottom:18px; margin-bottom:8px; }
+  .brand{ font-size:14px; font-weight:700; letter-spacing:.3px; color:var(--accent); }
+  h1{ font-size:26px; margin:10px 0 6px; }
+  .meta{ font-size:13px; color:var(--t3); }
+  h2{ font-size:19px; margin:30px 0 8px; padding-top:6px; }
+  h3{ font-size:16px; margin:20px 0 6px; color:var(--t); }
+  p,li{ color:var(--t2); }
+  a{ color:var(--accent); }
+  strong{ color:var(--t); }
+  .summary{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin:18px 0; }
+  table{ width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; display:block; overflow-x:auto; }
+  th,td{ border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; color:var(--t2); }
+  th{ background:var(--card); color:var(--t); white-space:nowrap; }
+  .note{ border-left:3px solid var(--accent); padding:10px 14px; background:rgba(245,158,11,.06); border-radius:0 8px 8px 0; margin:14px 0; font-size:14.5px; }
+  footer{ margin-top:40px; padding-top:18px; border-top:1px solid var(--line); font-size:13px; color:var(--t3); }
+  code{ background:var(--card); padding:1px 6px; border-radius:5px; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">QuotaFlo AI</div>
+    <h1>Privacy Policy</h1>
+    <div class="meta">Effective date: 31 May 2026 &middot; Last updated: 31 May 2026</div>
+  </header>
+
+  <p>This Privacy Policy explains how <strong>Up Top Technologies</strong> ("QuotaFlo", "we", "us")
+  collects, uses, and shares information when you use the QuotaFlo AI application and website (the "App").</p>
+
+  <p><strong>Contact:</strong> <a href="mailto:support.quotaflo@gmail.com">support.quotaflo@gmail.com</a><br>
+  <strong>Operator / data controller:</strong> Up Top Technologies, Greymouth, West Coast, New Zealand</p>
+
+  <div class="summary">
+    <h2 style="margin-top:4px;">1. Summary (plain English)</h2>
+    <ul>
+      <li>QuotaFlo is a tool for tradespeople to create quotes and invoices, scan supplier invoices, generate safety documents, track mileage, and use an AI assistant.</li>
+      <li><strong>Most of your business data lives on your device</strong> (in your browser's local storage): your jobs, quotes, invoices, materials, trips, client details, and your business profile. We do not have a central copy of this data.</li>
+      <li>Some features <strong>send data to our server and to third-party AI providers</strong> to work — for example, generating a quote, scanning a photo of an invoice, or producing a safety pack. Those flows are described in Section 3.</li>
+      <li>We use third parties for sign-in, payment, and AI processing. They are listed in Section 5.</li>
+      <li><strong>Honest security note:</strong> data stored on your device is <em>obfuscated</em>, not strongly encrypted, unless you create an encrypted backup (which is). See Section 7.</li>
+    </ul>
+  </div>
+
+  <h2>2. Who this applies to</h2>
+  <p>The App is intended for business users (sole traders and tradespeople). You may enter information about <strong>your clients</strong> (names, addresses, phone numbers, job details, prices). You are responsible for having a lawful basis to enter that information and for telling your clients how their information is used. We process it on your behalf.</p>
+
+  <h2>3. What we collect and why</h2>
+
+  <h3>3.1 Information stored on your device only</h3>
+  <p>The following is stored in your browser's local storage on your device and is <strong>not sent to our servers</strong> by the App in normal use:</p>
+  <ul>
+    <li><strong>Your business profile:</strong> your name, company name, business location, phone number, and (optionally) a company logo.</li>
+    <li><strong>Your business records:</strong> jobs, quotes, invoices, materials, mileage trips, and <strong>client details</strong> you enter (which may include client names, addresses, phone numbers, emails, job descriptions, and prices/GST).</li>
+    <li><strong>App settings</strong> (e.g. GST rate, theme) and a local lock <strong>PIN</strong>.</li>
+  </ul>
+  <p>This data stays on your device unless you choose to (a) use a feature that sends specific data to a third party (Section 3.2), (b) create a backup (Section 7), or (c) share a quote for approval (Section 3.3).</p>
+
+  <h3>3.2 Information processed by AI features</h3>
+  <p>When you use an AI feature, the relevant input is sent over an encrypted (HTTPS) connection to our server, which forwards it to a third-party AI provider, and the result is returned to you:</p>
+  <table>
+    <tr><th>Feature</th><th>What is sent</th><th>Sent to</th></tr>
+    <tr><td>Voice → quote</td><td>A <strong>text transcript</strong> of your speech (see voice note below) and the quote details</td><td>Our server → Anthropic</td></tr>
+    <tr><td>Generate quote / AI assistant / safety pack / JSA</td><td>The job/quote text and details you provide</td><td>Our server → Anthropic</td></tr>
+    <tr><td>Scan invoice</td><td>The <strong>photo</strong> you capture and the data extracted from it</td><td>Our server → Anthropic</td></tr>
+    <tr><td>Read-aloud (text-to-speech)</td><td>The <strong>text</strong> to be spoken</td><td>Our server → ElevenLabs</td></tr>
+  </table>
+  <div class="note"><strong>Voice note:</strong> Speech-to-text is performed by your <strong>browser's</strong> built-in speech recognition (the Web Speech API). In some browsers (e.g. Google Chrome) the <strong>audio of your voice is sent by the browser to the browser vendor (e.g. Google)</strong> for transcription. The App itself does <strong>not</strong> record, store, or transmit your voice audio to our servers — we only ever receive the resulting text. This processing is governed by your browser vendor's privacy policy.</div>
+
+  <h3>3.3 Quote approval</h3>
+  <p>If you send a client a quote-approval link, the quote and an approval status are stored in our database (Supabase) so the client can approve it from their device. This may include the client's name and the quote contents.</p>
+
+  <h3>3.4 Account and authentication</h3>
+  <p>If you create an account, we (via Supabase) collect your <strong>email address</strong> and a securely hashed password to sign you in.</p>
+
+  <h3>3.5 Payments</h3>
+  <p>Subscriptions are processed by <strong>Stripe</strong> via a hosted checkout page on our website. We do <strong>not</strong> receive or store your full card details; Stripe handles payment information under its own privacy policy. We receive a subscription status.</p>
+
+  <h3>3.6 Location</h3>
+  <p>If you enable weather or mileage tracking, the App uses your device location to:</p>
+  <ul>
+    <li>fetch local weather (sent to Open-Meteo), and</li>
+    <li>look up your approximate locality name (sent to BigDataCloud), and</li>
+    <li>record trip distances (stored on your device as mileage records).</li>
+  </ul>
+  <p>You can decline the location permission; those features then do not work, but the rest of the App does.</p>
+
+  <h3>3.7 Camera and microphone</h3>
+  <ul>
+    <li><strong>Camera</strong> is used to photograph supplier invoices and job sites for the scan/safety features (Section 3.2).</li>
+    <li><strong>Microphone</strong> is used for voice input (Section 3.2).</li>
+  </ul>
+  <p>Both are only accessed when you actively use those features.</p>
+
+  <h3>3.8 Technical/diagnostic data</h3>
+  <p>We may process limited technical data necessary to operate the service (e.g. request metadata to our API). As of the effective date, the App ships with <strong>no third-party analytics or crash-reporting SDK</strong>. If we add one in future, we will update this policy and our Google Play Data Safety form.</p>
+
+  <h2>4. How we use information</h2>
+  <ul>
+    <li>To provide the App's features (quotes, invoices, scanning, safety packs, mileage, AI assistant, read-aloud).</li>
+    <li>To authenticate you and manage your subscription.</li>
+    <li>To operate, maintain, secure, and improve the service.</li>
+    <li>To comply with legal obligations.</li>
+  </ul>
+  <p>We do <strong>not</strong> sell your personal information. We do <strong>not</strong> use your business data or your clients' data to train our own models. AI providers process it to return a result; their use is governed by their terms (Section 5).</p>
+
+  <h2>5. Third parties we share with</h2>
+  <table>
+    <tr><th>Provider</th><th>Purpose</th><th>What they receive</th></tr>
+    <tr><td><a href="https://www.anthropic.com/legal/privacy" rel="noopener" target="_blank">Anthropic</a></td><td>AI generation (quotes, assistant, safety, invoice scan)</td><td>The text/photo you submit to those features</td></tr>
+    <tr><td><a href="https://elevenlabs.io/privacy" rel="noopener" target="_blank">ElevenLabs</a></td><td>Text-to-speech</td><td>The text to be spoken</td></tr>
+    <tr><td><a href="https://supabase.com/privacy" rel="noopener" target="_blank">Supabase</a></td><td>Account sign-in and quote-approval storage</td><td>Email, hashed password, quote-approval records</td></tr>
+    <tr><td><a href="https://stripe.com/privacy" rel="noopener" target="_blank">Stripe</a></td><td>Subscription payments</td><td>Payment details (collected directly by Stripe)</td></tr>
+    <tr><td><a href="https://open-meteo.com/en/terms" rel="noopener" target="_blank">Open-Meteo</a></td><td>Weather</td><td>Approximate coordinates</td></tr>
+    <tr><td><a href="https://www.bigdatacloud.com/privacy-and-cookie-policy" rel="noopener" target="_blank">BigDataCloud</a></td><td>Reverse geocoding (locality name)</td><td>Approximate coordinates</td></tr>
+    <tr><td><a href="https://policies.google.com/privacy" rel="noopener" target="_blank">Your browser vendor (e.g. Google)</a></td><td>Speech-to-text (Web Speech API)</td><td>Your voice audio, via the browser</td></tr>
+    <tr><td><a href="https://render.com/privacy" rel="noopener" target="_blank">Render</a> &amp; <a href="https://docs.github.com/site-policy/privacy-policies/github-privacy-statement" rel="noopener" target="_blank">GitHub Pages</a></td><td>Hosting the API and the App</td><td>Standard request data</td></tr>
+  </table>
+  <p>Each provider acts under its own privacy policy (linked above).</p>
+
+  <h2>6. Retention</h2>
+  <ul>
+    <li><strong>On-device data</strong> stays until you delete it, clear your browser storage, or uninstall.</li>
+    <li><strong>Account data</strong> (email) is retained while your account is active. If you delete your account, your account record and quote-approval records are deleted within 30 days.</li>
+    <li>Data sent to AI providers is retained according to their policies; we do not keep a separate copy beyond what is needed to return your result.</li>
+  </ul>
+
+  <h2>7. Security — and an honest limitation</h2>
+  <ul>
+    <li>Data sent between the App, our server, and providers is protected <strong>in transit</strong> with HTTPS/TLS.</li>
+    <li>A local <strong>PIN</strong> can lock the App on your device.</li>
+    <li><strong>Important honesty note:</strong> the routine on-device storage uses lightweight <em>obfuscation</em>, <strong>not</strong> strong encryption, so it should not be relied on as protection if your unlocked device is accessed by someone else. <strong>Encrypted backups</strong> that you create with a passphrase <strong>are</strong> strongly encrypted (AES-GCM with PBKDF2-SHA-256 key derivation). Keep your backup passphrase safe — we cannot recover it.</li>
+    <li>No method of transmission or storage is 100% secure.</li>
+  </ul>
+
+  <h2>8. Your choices and rights</h2>
+  <ul>
+    <li><strong>Access / export / delete:</strong> Most of your data is on your device — you can view and delete it in the App, and export an encrypted backup. To delete your <strong>account</strong> and any server-side records (email, quote approvals), use <strong>Settings → Delete Account</strong> in the App, visit our <a href="./delete-account.html">account deletion page</a>, or email <a href="mailto:support.quotaflo@gmail.com">support.quotaflo@gmail.com</a>.</li>
+    <li><strong>Permissions:</strong> You can grant or revoke camera, microphone, and location permissions in your device/browser settings.</li>
+    <li>Depending on where you live, you may have rights to access, correct, delete, or restrict processing of your personal information (e.g. under the <strong>NZ Privacy Act 2020</strong>, <strong>GDPR</strong>, or <strong>Australian Privacy Act</strong>). Contact us to exercise them.</li>
+  </ul>
+
+  <h2>9. Children</h2>
+  <p>The App is for business use and is <strong>not intended for anyone under 18</strong>. We do not knowingly collect information from children.</p>
+
+  <h2>10. International transfers</h2>
+  <p>Our providers may process data in other countries (e.g. the United States). Where required, we rely on appropriate safeguards for those transfers.</p>
+
+  <h2>11. Changes</h2>
+  <p>We may update this policy. We will change the "Last updated" date and, for material changes, provide notice in the App.</p>
+
+  <h2>12. Contact</h2>
+  <p>Up Top Technologies<br>
+  Greymouth, West Coast, New Zealand<br>
+  <a href="mailto:support.quotaflo@gmail.com">support.quotaflo@gmail.com</a></p>
+
+  <footer>
+    QuotaFlo AI is operated by Up Top Technologies, Greymouth, West Coast, New Zealand.
+    This policy is provided in good faith and describes the App's data practices as at the effective date above.
+  </footer>
+</div>
+</body>
+</html>

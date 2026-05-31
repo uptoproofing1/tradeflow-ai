@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete your QuotaFlo account & data</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{ --bg:#070d1c; --card:#0f172a; --bdr:#1e293b; --t:#e2e8f0; --t2:#94a3b8; --p:#2563eb; --err:#ef4444; }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(160deg,#070d1c,#0b1430);color:var(--t);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.55;padding:24px;}
+  .wrap{max-width:640px;margin:0 auto;}
+  .logo{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
+  .logo img{width:40px;height:40px;border-radius:10px;}
+  .logo b{font-size:18px;font-weight:800;} .logo .ai{color:#0d8cff;}
+  h1{font-size:22px;margin:10px 0 4px;}
+  .card{background:var(--card);border:1px solid var(--bdr);border-radius:14px;padding:18px 18px;margin:16px 0;}
+  h2{font-size:15px;margin:0 0 10px;color:#fff;}
+  ol,ul{margin:0;padding-left:20px;} li{margin:6px 0;}
+  .muted{color:var(--t2);font-size:13px;}
+  a.btn{display:inline-block;background:var(--p);color:#fff;text-decoration:none;
+    padding:12px 18px;border-radius:10px;font-weight:700;margin-top:8px;}
+  code{background:#1e293b;padding:1px 6px;border-radius:5px;}
+  .foot{font-size:12px;color:var(--t2);margin-top:24px;text-align:center;}
+  .pill{display:inline-block;font-size:11px;background:rgba(239,68,68,.15);color:#fca5a5;
+    padding:2px 9px;border-radius:20px;font-weight:700;letter-spacing:.5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <img src="icon-192.png" alt="QuotaFlo logo">
+    <span><b>Quota<span class="ai">Flo</span></b></span>
+  </div>
+
+  <span class="pill">ACCOUNT &amp; DATA DELETION</span>
+  <h1>Delete your QuotaFlo account and data</h1>
+  <p class="muted">This page explains how to permanently delete your QuotaFlo AI account
+  and the data associated with it. You can do it yourself in the app, or request it by
+  email.</p>
+
+  <div class="card">
+    <h2>Option 1 — Delete it in the app (fastest)</h2>
+    <ol>
+      <li>Open <b>QuotaFlo AI</b> and unlock it.</li>
+      <li>Go to <b>More → Settings</b>.</li>
+      <li>Tap <b>Delete Account</b> (red).</li>
+      <li>Type <code>DELETE</code> to confirm.</li>
+    </ol>
+    <p class="muted">This erases all data stored on your device immediately and requests
+    deletion of your online account.</p>
+  </div>
+
+  <div class="card">
+    <h2>Option 2 — Request deletion by email</h2>
+    <p>If you can’t open the app, email us from the address on your account and we’ll
+    delete your account and associated data within <b>30 days</b>.</p>
+    <a class="btn" id="mailbtn" href="#">Email a deletion request</a>
+  </div>
+
+  <div class="card">
+    <h2>What gets deleted</h2>
+    <ul>
+      <li><b>On your device:</b> all jobs, quotes, invoices, materials, mileage trips,
+        client details, your business profile and app settings.</li>
+      <li><b>On our servers:</b> your account login (email) and any quote-approval records
+        linked to your account.</li>
+    </ul>
+    <p class="muted">Note: some data may be retained only where we’re legally required to
+    (e.g. tax/financial records held by our payment processor). Backups you exported
+    yourself stay on your own device until you delete them.</p>
+  </div>
+
+  <div class="foot">
+    QuotaFlo AI · For privacy details see our Privacy Policy.<br>
+    Questions? <span id="supportline"></span>
+  </div>
+</div>
+
+<script>
+  // Single source of truth for the support address.
+  var SUPPORT_EMAIL = 'support.quotaflo@gmail.com';
+  document.getElementById('supportline').textContent = SUPPORT_EMAIL;
+  var subject = encodeURIComponent('QuotaFlo account deletion request');
+  var body = encodeURIComponent(
+    'Please delete my QuotaFlo account and associated data.\n\n' +
+    'Account email: \n' +
+    '(Sent from the email address on my account so you can verify it.)\n'
+  );
+  document.getElementById('mailbtn').href =
+    'mailto:' + SUPPORT_EMAIL + '?subject=' + subject + '&body=' + body;
+</script>
+</body>
+</html>

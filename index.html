@@ -7072,6 +7072,56 @@ const SUPPORT_EMAIL = 'support.quotaflo@gmail.com';
 // the Render backend is the authority. No token (e.g. admin/offline) → omitted.
 function authHeader(){ const t = DB.get('authToken'); return t ? { 'Authorization': 'Bearer ' + t } : {}; }
 
+// ── Token refresh ─────────────────────────────────────────
+// Supabase access tokens (JWTs) expire ~1h after issue. Without refreshing,
+// authHeader() would keep sending a stale token, so once server-side gating is
+// on every AI call would 401 ~1h after login (this is exactly why the first
+// gating attempt was reverted — see backend-hardening §8 Landmine #1).
+// We refresh proactively (timer + on app resume + on load) using the rotating
+// refresh_token, updating authToken in place. authHeader() therefore always
+// reads a fresh token and no AI call site needs to change. Purely additive:
+// it can only PREVENT lockouts, never cause one.
+const _SB_URL = 'https://gnkxxcjlgtihrijqjgbk.supabase.co';
+const _SB_KEY = 'sb_publishable_YocoX0gXkyfMoauIJSwWdQ_Xc1FHzMt';
+let _refreshing = null; // de-dupe concurrent refreshes
+
+async function refreshAuthToken(){
+  const rt = DB.get('refreshToken');
+  if(!rt) return false;
+  if(_refreshing) return _refreshing;          // already in flight — share it
+  _refreshing = (async ()=>{
+    try{
+      const res = await fetch(`${_SB_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'apikey':_SB_KEY, 'Authorization':'Bearer '+_SB_KEY },
+        body: JSON.stringify({ refresh_token: rt })
+      });
+      if(!res.ok) return false;                 // invalid/expired refresh token → user must re-login
+      const d = await res.json();
+      if(!d.access_token) return false;
+      DB.set('authToken', d.access_token);
+      if(d.refresh_token) DB.set('refreshToken', d.refresh_token); // Supabase rotates these — must store the new one
+      DB.set('authTokenExp', Date.now() + (Number(d.expires_in)||3600)*1000);
+      return true;
+    }catch(e){ return false; }                  // offline etc. — keep existing token, try again later
+    finally{ _refreshing = null; }
+  })();
+  return _refreshing;
+}
+
+// Refresh if the token is missing an expiry (legacy session from before this
+// shipped) or is within 5 min of expiring. No-op when logged out or offline.
+async function ensureFreshToken(){
+  if(!DB.get('authToken') || !DB.get('refreshToken')) return;
+  const exp = DB.get('authTokenExp');
+  if(!exp || Date.now() > exp - 5*60*1000) await refreshAuthToken();
+}
+
+// Keep the token alive: check every 4 min, on app resume, and once at load.
+setInterval(ensureFreshToken, 4*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) ensureFreshToken(); });
+ensureFreshToken();
+
 // ── Voice options ─────────────────────────────────────────
 const VOICE_OPTIONS = [
   { id: '49TtX0KZLnuzDrAizTkN', label: 'James',   desc: 'British male' },
@@ -10019,6 +10069,7 @@ async function doLogout(){
   DB.set('authUser', null);
   DB.set('authToken', null);
   DB.set('refreshToken', null);
+  DB.set('authTokenExp', null);
   DB.set('subStatus', null);
   DB.set('trialStart', null);
   // Reload to trigger auth screen
@@ -11218,6 +11269,7 @@ function showAuthScreen(){
       });
       DB.set('authToken', data.session?.access_token || null);
       DB.set('refreshToken', data.session?.refresh_token || null);
+      DB.set('authTokenExp', data.session?.expires_at ? data.session.expires_at*1000 : Date.now() + (Number(data.session?.expires_in)||3600)*1000);
       DB.set('subStatus', 'trial');
       DB.set('trialStart', Date.now());
       
@@ -11270,7 +11322,8 @@ function showAuthScreen(){
       });
       DB.set('authToken', data.access_token);
       DB.set('refreshToken', data.refresh_token);
-      
+      DB.set('authTokenExp', data.expires_at ? data.expires_at*1000 : Date.now() + (Number(data.expires_in)||3600)*1000);
+
       // Preserve existing trial state if returning user, else start one
       if(!DB.get('subStatus')){
         DB.set('subStatus', 'trial');

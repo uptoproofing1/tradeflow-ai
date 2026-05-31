@@ -8,6 +8,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="QuotaFlo AI">
 <meta name="description" content="QuotaFlo AI — Built on the tools. Built for the tools.">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <title>QuotaFlo AI</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Poppins:wght@700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -1171,7 +1176,7 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
   <div class="lk-err" id="lk-err"></div>
   <div class="lk-att" id="lk-att"></div>
   <div class="lk-forgot" onclick="forgotPIN()">Forgot PIN?</div>
-  <div class="lk-hint">Enter your 4-digit PIN</div>
+  <div class="lk-hint">Default PIN: 1234 — change in Settings → Security</div>
 </div>
 
 <!-- AUTO-LOCK WARNING -->
@@ -1510,7 +1515,7 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
   <!-- Compact security footer -->
   <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:4px 14px 18px;opacity:.5;">
     <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:var(--t3);"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
-    <span style="font-size:10px;color:var(--t3);letter-spacing:.3px;">PIN-locked on this device · Auto-locks when idle</span>
+    <span style="font-size:10px;color:var(--t3);letter-spacing:.3px;">Data protected · PIN lock active · Secure sync &amp; auto-locks</span>
   </div>
 </div>
 
@@ -2157,10 +2162,98 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
       <input class="frm-inp" id="sched-notes" type="text" placeholder="e.g. Early start, gate code 1234">
     </div>
 
+    <div class="frm-grp">
+      <label class="frm-lbl">Assign to employee</label>
+      <select class="frm-inp" id="sched-assignee"></select>
+      <div style="font-size:11px;color:var(--t3);margin-top:4px;">Assigned staff get a notification and see this job (scope, address, date &amp; site notes — no pricing). Manage staff in Settings → Manage Employees.</div>
+    </div>
+
     <div style="display:flex;gap:8px;">
       <button class="btn btn-r" id="sched-delete-btn" onclick="deleteScheduledJob()" style="display:none;flex:0 0 auto;width:auto;padding:13px 18px;">Delete</button>
       <button class="btn btn-o" onclick="hide('schedule-modal')">Cancel</button>
       <button class="btn btn-p" onclick="saveScheduledJob()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     EMPLOYEES (linked staff + job dispatch) — Phase 1 (local)
+════════════════════════════════════════════════════════ -->
+<div id="employees-modal" class="cmbg">
+  <div class="cmsh" style="max-height:90vh;overflow-y:auto;">
+    <div class="cm-hdr">
+      <div class="cm-t">👷 Manage Employees</div>
+      <div class="cm-x" onclick="hide('employees-modal')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></div>
+    </div>
+
+    <div style="padding:11px 13px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.25);border-radius:var(--r2);font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">
+      💡 Link your staff, then assign them jobs from the calendar. They get a notification and a job view with <strong>scope, materials &amp; safety — but no pricing</strong>.
+      <span style="color:var(--t3);">Paid add-on (per employee) — preview build, billing not yet live.</span>
+    </div>
+
+    <div class="frm-grp">
+      <label class="frm-lbl">Add employee</label>
+      <input class="frm-inp" id="emp-name" type="text" placeholder="Name (e.g. David)" style="margin-bottom:7px;">
+      <input class="frm-inp" id="emp-email" type="email" placeholder="Email (their login)" style="margin-bottom:7px;">
+      <input class="frm-inp" id="emp-phone" type="tel" placeholder="Mobile (optional)">
+      <button class="btn btn-p" onclick="addEmployee()" style="margin-top:9px;">+ Add employee</button>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;gap:6px;">
+      <div class="frm-lbl" style="margin:0;">Your team</div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="openToolboxComposer()" style="background:rgba(239,68,68,.12);border:none;color:#dc2626;font-size:11px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer;">📋 Toolbox talk</button>
+        <button onclick="enableNotifications()" style="background:none;border:1px solid var(--bdr);color:var(--t2);font-size:11px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer;">🔔 Notify</button>
+      </div>
+    </div>
+    <div id="emp-list"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     EMPLOYEE MODE — the employee's own basic app
+     (My Jobs · Mileage · Safety). No pricing, no materials.
+════════════════════════════════════════════════════════ -->
+<div id="emp-mode" style="display:none;position:fixed;inset:0;z-index:600;background:var(--bg);flex-direction:column;">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--card);border-bottom:1px solid var(--bdr);">
+    <div style="width:34px;height:34px;border-radius:50%;background:rgba(37,99,235,.15);color:#2563eb;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;" id="emp-mode-av">D</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:800;color:var(--t);line-height:1.1;" id="emp-mode-name">David</div>
+      <div style="font-size:11px;color:var(--t3);">Employee view · preview</div>
+    </div>
+    <button onclick="exitEmployeeMode()" style="background:none;border:1px solid var(--bdr);color:var(--t2);font-size:12px;font-weight:700;padding:7px 12px;border-radius:9px;cursor:pointer;">✕ Exit</button>
+  </div>
+  <div id="emp-mode-body" style="flex:1;overflow-y:auto;padding:14px;-webkit-overflow-scrolling:touch;"></div>
+  <div style="display:flex;border-top:1px solid var(--bdr);background:var(--card);">
+    <div class="emp-tab" id="emp-tab-jobs" onclick="empTab('jobs')" style="flex:1;text-align:center;padding:11px 4px;cursor:pointer;font-size:11px;font-weight:700;">🧰<br>My Jobs</div>
+    <div class="emp-tab" id="emp-tab-mileage" onclick="empTab('mileage')" style="flex:1;text-align:center;padding:11px 4px;cursor:pointer;font-size:11px;font-weight:700;">🚗<br>Mileage</div>
+    <div class="emp-tab" id="emp-tab-safety" onclick="empTab('safety')" style="flex:1;text-align:center;padding:11px 4px;cursor:pointer;font-size:11px;font-weight:700;">🦺<br>Safety</div>
+  </div>
+</div>
+
+<!-- Toolbox-talk composer (employer → employee safety dispatch) -->
+<div id="toolbox-modal" class="cmbg">
+  <div class="cmsh" style="max-height:90vh;overflow-y:auto;">
+    <div class="cm-hdr">
+      <div class="cm-t">📋 Send Toolbox Talk</div>
+      <div class="cm-x" onclick="hide('toolbox-modal')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></div>
+    </div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:12px;line-height:1.6;">A toolbox talk is a short safety briefing. It’s sent to your staff’s phones; they tick “read” to confirm.</div>
+    <div class="frm-grp">
+      <label class="frm-lbl">Title</label>
+      <input class="frm-inp" id="tbx-title" type="text" placeholder="e.g. Working at heights — ladders">
+    </div>
+    <div class="frm-grp">
+      <label class="frm-lbl">Briefing</label>
+      <textarea class="frm-inp" id="tbx-body" rows="5" placeholder="Key points the crew must know before starting…"></textarea>
+    </div>
+    <div class="frm-grp">
+      <label class="frm-lbl">Send to</label>
+      <div id="tbx-recipients" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-o" onclick="hide('toolbox-modal')">Cancel</button>
+      <button class="btn btn-p" onclick="sendToolboxTalk()">Send talk</button>
     </div>
   </div>
 </div>
@@ -2510,6 +2603,22 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
   </div>
 
   <div class="set-sec">
+    <div class="set-t">Data &amp; Backup</div>
+    <div class="set-card">
+      <div class="set-row" onclick="backupExport()">
+        <div class="si" style="background:#dcfce7;"><svg viewBox="0 0 24 24" style="fill:#16a34a;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></div>
+        <div style="flex:1;"><div class="sl2">Back Up My Data</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">Save an encrypted file of everything. Keep it safe.</div></div>
+        <svg class="sarr" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+      <div class="set-row" onclick="backupRestore()">
+        <div class="si" style="background:#dbeafe;"><svg viewBox="0 0 24 24" style="fill:#2563eb;"><path d="M5 15h4v6h6v-6h4l-7-7-7 7zM5 6v-2h14v2H5z"/></svg></div>
+        <div style="flex:1;"><div class="sl2">Restore From Backup</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">Load a backup file. Replaces data on this device.</div></div>
+        <svg class="sarr" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="set-sec">
     <div class="set-t">Account</div>
     <div class="set-card">
       <div class="set-row" onclick="show('profile-modal')">
@@ -2523,17 +2632,12 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
         <span class="sv2" id="gst-display">15%</span>
         <svg class="sarr" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
       </div>
-      <div class="set-row" onclick="backupData()">
-        <div class="si" style="background:#dcfce7;"><svg viewBox="0 0 24 24" style="fill:#16a34a;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></div>
-        <div style="flex:1;"><div class="sl2">Back Up My Data</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">Save a password-protected backup file</div></div>
+      <div class="set-row" onclick="openEmployeesModal()">
+        <div class="si" style="background:rgba(37,99,235,.15);"><svg viewBox="0 0 24 24" style="fill:#2563eb;"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+        <div style="flex:1;"><div class="sl2">Manage Employees</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">Link staff, assign jobs &amp; send notifications</div></div>
+        <span class="sv2" style="font-size:10px;background:rgba(37,99,235,.15);color:#2563eb;padding:2px 7px;border-radius:8px;font-weight:700;">ADD-ON</span>
         <svg class="sarr" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
       </div>
-      <div class="set-row" onclick="restoreDataPrompt()">
-        <div class="si" style="background:#dbeafe;"><svg viewBox="0 0 24 24" style="fill:#2563eb;"><path d="M5 15h4v6h6v-6h4l-7-7-7 7zM5 4v2h14V4H5z"/></svg></div>
-        <div style="flex:1;"><div class="sl2">Restore From Backup</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">Load a backup file onto this device</div></div>
-        <svg class="sarr" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-      </div>
-      <input type="file" id="restore-file-input" accept=".json,application/json" style="display:none;" onchange="restoreDataFile(event)">
       <div class="set-row" onclick="clearAllData()">
         <div class="si" style="background:#fee2e2;"><svg viewBox="0 0 24 24" style="fill:#dc2626;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
         <span class="sl2" style="color:var(--err);">Clear All Data</span>
@@ -2541,6 +2645,10 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
       <div class="set-row" onclick="doLogout()">
         <div class="si" style="background:#fef3c7;"><svg viewBox="0 0 24 24" style="fill:#d97706;"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg></div>
         <span class="sl2" style="color:#d97706;">Log Out</span>
+      </div>
+      <div class="set-row" onclick="deleteAccount()">
+        <div class="si" style="background:#fee2e2;"><svg viewBox="0 0 24 24" style="fill:#dc2626;"><path d="M15 4V3H9v1H4v2h1v13c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V6h1V4h-5zm-1 12h-2v-6h2v6zm-4 0H8v-6h2v6z"/></svg></div>
+        <div style="flex:1;"><div class="sl2" style="color:var(--err);">Delete Account</div><div style="font-size:11px;color:var(--t3);margin-top:1px;">Permanently erase this device’s data &amp; your account</div></div>
       </div>
       <div class="set-row" onclick="openJessicaHelp()">
         <div class="si" style="background:rgba(249,115,22,.15);padding:0;overflow:hidden;">
@@ -2559,7 +2667,7 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
   <div class="set-sec">
     <div class="set-t">Security</div>
     <div class="set-card">
-      <div class="set-row" onclick="openPinSetup(false)">
+      <div class="set-row" onclick="show('pin-modal')">
         <div class="si"><svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg></div>
         <div style="flex:1;"><div class="sl2">PIN Lock</div><div style="font-size:11px;color:var(--ok);margin-top:1px;">✓ Active — tap to change PIN</div></div>
         <svg class="sarr" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
@@ -2578,7 +2686,7 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
     </div>
     <div style="margin-top:8px;padding:12px 14px;background:var(--card);border:1px solid var(--bdr);border-radius:var(--r2);font-size:12px;color:var(--t2);line-height:1.7;">
       🛡️ <strong style="color:var(--t);">Security</strong><br>
-      • 4-digit PIN — you choose this when you first sign up<br>
+      • 4-digit PIN · Default: 1234 — change it now<br>
       • Auto-lock after inactivity (1, 2, 5, 10, 30 min)<br>
       • Tab-hide triggers immediate lock<br>
       • Max 5 wrong attempts → 5-minute lockout<br>
@@ -2791,16 +2899,6 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
       <span style="color:var(--t3);font-style:italic;font-size:12px;">Tap mic and tell me what you need</span>
     </div>
 
-    <!-- Type-instead fallback — works with no mic, on noisy/no-signal sites, and for non-speaking users -->
-    <div style="display:flex;gap:8px;margin-bottom:12px;">
-      <input id="ai-text-input" type="text" inputmode="text" autocomplete="off"
-        placeholder="…or type what you need"
-        aria-label="Type your request for the AI assistant"
-        onkeydown="if(event.key==='Enter'){event.preventDefault();aiSubmitTyped();}"
-        style="flex:1;min-width:0;padding:12px 14px;border-radius:10px;border:1px solid var(--bdr);background:var(--bg);color:var(--t);font-size:14px;outline:none;font-family:'DM Sans',sans-serif;">
-      <button class="btn btn-p" style="width:auto;flex:0 0 auto;padding:12px 16px;" onclick="aiSubmitTyped()">Send</button>
-    </div>
-
     <!-- Response/action -->
     <div id="ai-response" style="display:none;padding:12px 14px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;font-size:13px;color:#4ade80;margin-bottom:12px;"></div>
 
@@ -3007,16 +3105,16 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
       <p style="margin-top:8px;">Each of these services has their own privacy policy. We only share the minimum data necessary for each service to function.</p>
 
       <div style="font-weight:700;color:var(--t);margin-top:14px;margin-bottom:4px;">5. Data storage and security</div>
-      <p>Your account details and any quotes you send to customers for online approval are stored in Supabase, which keeps them encrypted at rest and uses row-level security so only your account can access them. All data sent between the app and our servers is encrypted in transit (HTTPS/TLS). Your other business records — jobs, clients, invoices, materials and mileage — are stored only on your device so the app works offline; they are <strong>not yet backed up to the cloud</strong>, so protect your device with the PIN lock and your phone's own screen lock, and be aware that losing or wiping the device will lose that data. Your PIN is stored only on your device and is never transmitted to our servers.</p>
+      <p>Your business data syncs to Supabase, which stores it with encryption at rest and protects it with row-level security controls so only your account can access it. All data sent between the app and our servers is encrypted in transit (HTTPS/TLS). Data is also kept on your device so the app works offline; protect your device with the PIN lock and your phone's own screen lock. Your PIN is stored only on your device and is never transmitted to our servers.</p>
 
       <div style="font-weight:700;color:var(--t);margin-top:14px;margin-bottom:4px;">6. Your rights (NZ Privacy Act 2020)</div>
-      <p>You have the right to access, correct, or request deletion of your personal information at any time. To exercise these rights, contact us at marty5883@gmail.com. We will respond within 20 working days.</p>
+      <p>You have the right to access, correct, or request deletion of your personal information at any time. To exercise these rights, contact us at support.quotaflo@gmail.com. We will respond within 20 working days.</p>
 
       <div style="font-weight:700;color:var(--t);margin-top:14px;margin-bottom:4px;">7. Data retention</div>
       <p>We retain your data for as long as your account is active plus 12 months. If you cancel your subscription and delete your account, all personal data is deleted within 30 days.</p>
 
       <div style="font-weight:700;color:var(--t);margin-top:14px;margin-bottom:4px;">8. Contact</div>
-      <p>Privacy enquiries: <strong>marty5883@gmail.com</strong><br>Up Top Technologies Ltd, Greymouth, West Coast, New Zealand</p>
+      <p>Privacy enquiries: <strong>support.quotaflo@gmail.com</strong><br>Up Top Technologies Ltd, Greymouth, West Coast, New Zealand</p>
     </div>
 
     <!-- Terms of Service -->
@@ -3051,7 +3149,7 @@ body.tour-lock{overflow:hidden!important;touch-action:none;}
       <p>These terms are governed by the laws of New Zealand. Any disputes will be resolved in the courts of New Zealand.</p>
 
       <div style="font-weight:700;color:var(--t);margin-top:14px;margin-bottom:4px;">10. Contact</div>
-      <p>Legal enquiries: <strong>marty5883@gmail.com</strong><br>Up Top Technologies Ltd, Greymouth, West Coast, New Zealand</p>
+      <p>Legal enquiries: <strong>support.quotaflo@gmail.com</strong><br>Up Top Technologies Ltd, Greymouth, West Coast, New Zealand</p>
     </div>
 
     <button class="btn btn-o" style="width:100%;margin-top:20px;" onclick="hide('legal-modal')">Close</button>
@@ -3497,8 +3595,7 @@ const SS = {
 // ═══════════════════════════════════════════════════════════
 let pinBuf='', pinAttempts=0, lockoutUntil=0, appLocked=true;
 const MAX_ATT = 5;
-const getPin  = () => SS.get('pin') || '';
-const hasPin  = () => !!SS.get('pin');
+const getPin = () => SS.get('pin') || '1234';
 
 function pinKey(k) {
   if(Date.now() < lockoutUntil) {
@@ -3547,6 +3644,16 @@ function unlockApp() {
     setTimeout(showJessFab, 600);
   }, 300);
   resetAutoLock();
+  const name = profile.name ? ', '+profile.name.split(' ')[0] : '';
+  // One-time nudge: if still on the default PIN, encourage changing it
+  if(getPin() === '1234' && !DB.get('pinNudged', false)){
+    DB.set('pinNudged', true);
+    setTimeout(function(){
+      if(confirm('🔐 You\u2019re still using the default PIN (1234).\n\nFor your security, set your own PIN now? It protects all your customer data, quotes and invoices.')){
+        if(typeof show === 'function') show('pin-modal');
+      }
+    }, 1200);
+  }
 }
 
 function lockNow() {
@@ -3571,20 +3678,6 @@ function tryBiometric() {
   setLkErr('Please enter your PIN to unlock.');
 }
 
-// Open the PIN modal. forced=true => first-run "Create your PIN" (no close X,
-// can't be skipped); forced=false => normal "Change PIN" from Settings.
-let _pinSetupForced=false, _pinSetupDone=null;
-function openPinSetup(forced, onDone){
-  _pinSetupForced = !!forced;
-  _pinSetupDone   = onDone || null;
-  const modal = document.getElementById('pin-modal');
-  const t = modal.querySelector('.cm-t'); if(t) t.textContent = forced ? '🔐 Create your PIN' : '🔐 Change PIN';
-  const x = modal.querySelector('.cm-x'); if(x) x.style.display = forced ? 'none' : '';
-  const i1=document.getElementById('new-pin-1'), i2=document.getElementById('new-pin-2'), er=document.getElementById('pin-setup-err');
-  if(i1) i1.value=''; if(i2) i2.value=''; if(er) er.textContent='';
-  show('pin-modal');
-}
-
 function savePIN() {
   const p1 = document.getElementById('new-pin-1').value;
   const p2 = document.getElementById('new-pin-2').value;
@@ -3593,26 +3686,10 @@ function savePIN() {
   if(p1 !== p2){ e.textContent='PINs do not match.'; return; }
   if(['0000','1111','1234','4321','0123','9999'].includes(p1)){ e.textContent='Choose a less obvious PIN.'; return; }
   SS.set('pin', p1); e.textContent='';
+  hide('pin-modal');
   document.getElementById('new-pin-1').value='';
   document.getElementById('new-pin-2').value='';
-  const forced = _pinSetupForced, done = _pinSetupDone;
-  _pinSetupForced=false; _pinSetupDone=null;
-  const x = document.getElementById('pin-modal').querySelector('.cm-x'); if(x) x.style.display='';
-  hide('pin-modal');
-  if(forced && typeof done === 'function') done();
-}
-
-// After auth: if a PIN exists, show the lock screen to enter it; if none is set
-// yet (brand-new user, or an older default-PIN install), force PIN creation then
-// go straight in. No default PIN is ever shipped.
-function enterAfterAuth(){
-  if(hasPin()){
-    const ls = document.getElementById('lock-screen');
-    if(ls) ls.classList.remove('hidden');
-    updateLkClock();
-  } else {
-    openPinSetup(true, function(){ unlockApp(); });
-  }
+  
 }
 
 // ── AUTO-LOCK ─────────────────────────────────────────────
@@ -3705,25 +3782,141 @@ let selCtry   = null; // set from COUNTRIES after definition
 
 function save(){ DB.set('jobs',jobs); DB.set('materials',materials); DB.set('trips',trips); DB.set('invoices',invoices); DB.set('quotes',quotes); DB.set('clients',clients); DB.set('profile',profile); DB.set('settings',settings); DB.set('qSeq',qSeq); }
 
-// Per-account data isolation. Business data lives on the device (localStorage),
-// not in the cloud, so we tag it with the owning account id ('dataOwner'). When
-// a different account signs in/up on the same device we clear the previous
-// account's data so each account only ever sees its own — and new signups start
-// completely clean. Auth/device keys (PIN, tokens, sub) are preserved.
-function clearLocalBusinessData(){
-  const PRESERVE = ['tf_authUser','tf_authToken','tf_refreshToken','tf_subStatus','tf_trialStart','tf_isAdmin','tf_pin','tf_lock_time','tf_dataOwner','tf_country'];
-  for(let i = localStorage.length - 1; i >= 0; i--){
+// ═══════════════════════════════════════════════════════════
+// ENCRYPTED BACKUP / RESTORE  (WebCrypto: AES-GCM + PBKDF2-SHA256)
+// This is the data-loss safety net AND the crypto foundation that the
+// at-rest encryption work (#5) reuses — keep _b64/_unb64/_backupDeriveKey
+// generic. The backup file is encrypted with a user-chosen passphrase
+// (key model "B"): the PIN unlocks day-to-day; a passphrase is the real key.
+// ═══════════════════════════════════════════════════════════
+const _BKP_FMT = 'qf-backup-1';
+const _BKP_ITER = 250000;
+
+function _b64(buf){
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = '';
+  for(let i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function _unb64(str){
+  const bin = atob(str);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+async function _backupDeriveKey(passphrase, salt, usage){
+  const baseKey = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:_BKP_ITER, hash:'SHA-256' },
+    baseKey,
+    { name:'AES-GCM', length:256 },
+    false,
+    usage || ['encrypt','decrypt']
+  );
+}
+
+// Snapshot every tf_* localStorage key verbatim, so restore is schema-agnostic
+// and survives future fields without code changes.
+function _snapshotTfKeys(){
+  const keys = {};
+  for(let i=0;i<localStorage.length;i++){
     const k = localStorage.key(i);
-    if(k && k.indexOf('tf_') === 0 && PRESERVE.indexOf(k) === -1){ localStorage.removeItem(k); }
+    if(k && k.indexOf('tf_')===0) keys[k] = localStorage.getItem(k);
   }
-  // Reset in-memory state so nothing from the previous account lingers on screen.
-  jobs=[]; materials=[]; trips=[]; invoices=[]; quotes=[]; clients=[];
-  profile = {name:'',company:'',location:'',phone:''};
-  settings = {gst:15,theme:'',vg:'f'};
-  qSeq = 1;
-  try{ scheduledJobs = []; }catch(e){}
-  try{ productWarranties = []; }catch(e){}
-  try{ inductedWorkers = []; }catch(e){}
+  return keys;
+}
+
+async function backupExport(){
+  if(!(window.crypto && crypto.subtle)){
+    alert('Secure backup needs HTTPS. Open the installed app (or an https:// link) and try again.');
+    return;
+  }
+  const pass = prompt('Choose a password to encrypt this backup.\n\nYou’ll need this exact password to restore it on any device. Write it down — we cannot recover it for you.');
+  if(pass === null) return;
+  if(pass.length < 8){ alert('Use at least 8 characters for the backup password.'); return; }
+  const pass2 = prompt('Re-enter the backup password to confirm.');
+  if(pass2 === null) return;
+  if(pass !== pass2){ alert('Passwords did not match. Backup cancelled — nothing was saved.'); return; }
+  try {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const key  = await _backupDeriveKey(pass, salt, ['encrypt']);
+    const snapshot = _snapshotTfKeys();
+    const plain = new TextEncoder().encode(JSON.stringify(snapshot));
+    const ctBuf = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, plain);
+    const now = new Date();
+    const fileObj = {
+      app:'QuotaFlo', fmt:_BKP_FMT, alg:'AES-GCM', kdf:'PBKDF2-SHA256',
+      iter:_BKP_ITER, salt:_b64(salt), iv:_b64(iv), ct:_b64(ctBuf),
+      keyCount:Object.keys(snapshot).length, created:now.toISOString()
+    };
+    const blob = new Blob([JSON.stringify(fileObj)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `quotaflo-backup-${now.toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1500);
+    DB.set('lastBackup', now.toISOString());
+    if(typeof speak === 'function') speak('Encrypted backup saved. Keep the file and password somewhere safe.');
+  } catch(e){
+    alert('Backup failed: ' + (e && e.message ? e.message : e));
+  }
+}
+
+function backupRestore(){
+  if(!(window.crypto && crypto.subtle)){
+    alert('Secure restore needs HTTPS. Open the installed app (or an https:// link) and try again.');
+    return;
+  }
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'application/json,.json';
+  inp.onchange = async function(){
+    const f = inp.files && inp.files[0];
+    if(!f) return;
+    let fileObj;
+    try { fileObj = JSON.parse(await f.text()); }
+    catch(e){ alert('That file isn’t a valid QuotaFlo backup.'); return; }
+    if(!fileObj || fileObj.fmt !== _BKP_FMT || !fileObj.ct || !fileObj.salt || !fileObj.iv){
+      alert('That file isn’t a QuotaFlo backup (unrecognised format).'); return;
+    }
+    const pass = prompt('Enter the backup password to restore your data.');
+    if(pass === null) return;
+    let snapshot;
+    try {
+      const key = await _backupDeriveKey(pass, _unb64(fileObj.salt), ['decrypt']);
+      const ptBuf = await crypto.subtle.decrypt({ name:'AES-GCM', iv:_unb64(fileObj.iv) }, key, _unb64(fileObj.ct));
+      snapshot = JSON.parse(new TextDecoder().decode(ptBuf));
+    } catch(e){
+      alert('Could not unlock this backup. The password is wrong or the file is damaged.\n\nYour current data has NOT been changed.');
+      return;
+    }
+    if(!snapshot || typeof snapshot !== 'object' || !Object.keys(snapshot).length){
+      alert('Backup unlocked but contained no data. Nothing was changed.'); return;
+    }
+    const n = Object.keys(snapshot).length;
+    const when = fileObj.created ? new Date(fileObj.created).toLocaleString() : 'unknown date';
+    if(!confirm(`Restore this backup?\n\nFrom: ${when}\nItems: ${n}\n\nThis REPLACES all data currently on this device, and restores the PIN from the backup. This cannot be undone.`)) return;
+    try {
+      // Remove existing tf_* keys, then write the snapshot verbatim.
+      const toRemove = [];
+      for(let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        if(k && k.indexOf('tf_')===0) toRemove.push(k);
+      }
+      toRemove.forEach(k => localStorage.removeItem(k));
+      Object.keys(snapshot).forEach(k => {
+        if(k.indexOf('tf_')===0 && typeof snapshot[k]==='string') localStorage.setItem(k, snapshot[k]);
+      });
+    } catch(e){
+      alert('Restore failed while writing data: ' + (e && e.message ? e.message : e) + '\n\nYour device storage may be full. Some data may be incomplete — re-run the restore once space is freed.');
+      return;
+    }
+    alert('Restore complete. The app will now reload with your restored data.');
+    location.reload();
+  };
+  inp.click();
 }
 
 // ── Financial Year helpers (NZ: 1 Apr to 31 Mar) ──
@@ -3821,8 +4014,6 @@ function aiCloseModal(){
   if(resp) resp.style.display='none';
   const sub = document.getElementById('ai-submit-btn');
   if(sub) sub.style.display='none';
-  const ti = document.getElementById('ai-text-input');
-  if(ti) ti.value='';
 }
 
 function aiToggleListen(){
@@ -4078,25 +4269,9 @@ async function aiScopeFromVoice(){
   }
 }
 
-// Typed path — same pipeline as voice. Lets the assistant work on noisy/no-signal
-// sites and for people who can't or don't want to speak aloud.
-function aiSubmitTyped(){
-  const inp = document.getElementById('ai-text-input');
-  const txt = inp ? inp.value.trim() : '';
-  if(txt.length < 3){
-    alert('Type what you need — e.g. "create an estimate for 20m of pine framing for John Smith".');
-    if(inp) inp.focus();
-    return;
-  }
-  if(aiListening) aiStopListen();   // stop the mic if it happened to be running
-  aiTranscript = txt;
-  if(inp) inp.value='';
-  aiProcessText();
-}
-
 async function aiProcessText(){
   if(!aiTranscript || aiTranscript.length < 3){
-    alert('Tap the mic and speak, or type your request below.');
+    alert('Please speak your command first.');
     return;
   }
   const resp = document.getElementById('ai-response');
@@ -4151,7 +4326,7 @@ async function aiProcessText(){
   try {
     const res = await fetch(`${API}/api/assistant`, {
       method: 'POST',
-      headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+      headers: { 'Content-Type':'application/json', 'Accept':'application/json', ...authHeader() },
       mode: 'cors',
       body: JSON.stringify({
         command: aiTranscript,
@@ -5290,6 +5465,297 @@ function resetJobTypes(){
 
 function saveScheduledJobsData(){ DB.set('scheduledJobs', scheduledJobs); }
 
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEES — linked staff + job dispatch  (Phase 1, local-only)
+   ---------------------------------------------------------------
+   Phase 1 is fully client-side so it's demoable now. The pieces
+   marked TODO(server) need the Render API + Supabase to become a
+   real cross-device, multi-account feature:
+     • linked employee LOGINS (their own auth, scoped to this biz)
+     • server-side job sync owner→employee
+     • server-side pricing redaction + RLS (never trust the client)
+     • real Web Push (VAPID + sw.js push handler), not local Notify
+     • per-seat billing enforcement
+   See docs/DRAFT-employee-linked-accounts.md.
+═══════════════════════════════════════════════════════════════ */
+let employees = DB.get('employees') || [];
+function saveEmployees(){ DB.set('employees', employees); }
+
+function openEmployeesModal(){ renderEmpList(); show('employees-modal'); }
+
+function addEmployee(){
+  const name  = document.getElementById('emp-name').value.trim();
+  const email = document.getElementById('emp-email').value.trim();
+  const phone = document.getElementById('emp-phone').value.trim();
+  if(!name){ alert('Enter the employee’s name.'); return; }
+  employees.push({ id:'emp_'+Date.now(), name, email, phone, createdAt: Date.now() });
+  saveEmployees();
+  // TODO(server): send an invite to `email` so they can create their linked login.
+  document.getElementById('emp-name').value = '';
+  document.getElementById('emp-email').value = '';
+  document.getElementById('emp-phone').value = '';
+  renderEmpList();
+}
+
+function removeEmployee(id){
+  const e = employees.find(x => x.id === id);
+  if(!e) return;
+  if(!confirm('Remove '+e.name+'? Their job assignments will be unassigned.')) return;
+  employees = employees.filter(x => x.id !== id);
+  // Unassign any jobs that pointed at them
+  scheduledJobs.forEach(j => { if(j.assignedTo === id) j.assignedTo = null; });
+  saveEmployees(); saveScheduledJobsData();
+  renderEmpList();
+}
+
+function renderEmpList(){
+  const el = document.getElementById('emp-list');
+  if(!el) return;
+  if(!employees.length){
+    el.innerHTML = '<div style="padding:18px;text-align:center;color:var(--t3);font-size:13px;">No employees yet. Add your first staff member above.</div>';
+    return;
+  }
+  el.innerHTML = employees.map(e => {
+    const count = scheduledJobs.filter(j => j.assignedTo === e.id).length;
+    return `<div style="display:flex;align-items:center;gap:11px;padding:11px 12px;background:var(--card);border:1px solid var(--bdr);border-radius:var(--r2);margin-bottom:8px;">
+      <div style="width:38px;height:38px;border-radius:50%;background:rgba(37,99,235,.15);color:#2563eb;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;">${esc((e.name[0]||'?').toUpperCase())}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;color:var(--t);">${esc(e.name)}</div>
+        <div style="font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(e.email||'no email')}${e.phone?' · '+esc(e.phone):''} · ${count} job${count===1?'':'s'}</div>
+      </div>
+      <button onclick="enterEmployeeMode('${e.id}')" style="background:rgba(34,197,94,.15);border:none;color:#16a34a;font-size:11px;font-weight:700;padding:6px 9px;border-radius:8px;cursor:pointer;white-space:nowrap;">👁 View</button>
+      <button onclick="removeEmployee('${e.id}')" style="background:none;border:none;color:var(--err);cursor:pointer;padding:5px;font-size:17px;line-height:1;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+/* Notifications. Phase 1 uses the local Notification API as a stand-in.
+   TODO(server): replace with real Web Push — store the employee's push
+   subscription on the server (VAPID), and the server pushes to THEIR
+   device when the owner assigns a job. */
+function enableNotifications(){
+  if(!('Notification' in window)){ alert('This device doesn’t support notifications.'); return; }
+  Notification.requestPermission().then(p => {
+    alert(p === 'granted'
+      ? '🔔 Notifications enabled. Assigned staff will be alerted on this device.\n\n(Cross-device push to the employee’s own phone arrives with the server build.)'
+      : 'Notifications are blocked. You can re-enable them in your browser settings.');
+  });
+}
+
+function notifyEmployee(emp, job){
+  const body = `${emp.name}, you’ve been booked: ${job.title} on ${job.startDate}`;
+  try{
+    if(('Notification' in window) && Notification.permission === 'granted'){
+      new Notification('QuotaFlo — New job assigned', { body });
+    } else if(typeof toast === 'function'){
+      toast('🔔 '+body);
+    } else {
+      console.log(body);
+    }
+  }catch(e){ console.log(body); }
+  // TODO(server): POST assignment → server pushes to emp's linked device via Web Push.
+}
+
+/* ─── TOOLBOX TALKS (employer → employee safety dispatch) ───
+   Stored locally in Phase 1. talk = {id,title,body,date,to:[empId],acks:{empId:ts}}.
+   TODO(server): persist server-side + Web Push so it reaches the employee's
+   own device, and the ack is recorded against their login for compliance. */
+let toolboxTalks = DB.get('toolboxTalks') || [];
+function saveToolboxTalks(){ DB.set('toolboxTalks', toolboxTalks); }
+
+function openToolboxComposer(){
+  if(!employees.length){ alert('Add an employee first.'); return; }
+  document.getElementById('tbx-title').value = '';
+  document.getElementById('tbx-body').value = '';
+  document.getElementById('tbx-recipients').innerHTML = employees.map(e =>
+    `<label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--t);cursor:pointer;">
+      <input type="checkbox" class="tbx-rcpt" value="${e.id}" checked style="width:17px;height:17px;"> ${esc(e.name)}
+    </label>`).join('');
+  show('toolbox-modal');
+}
+
+function sendToolboxTalk(){
+  const title = document.getElementById('tbx-title').value.trim();
+  const bodyTxt = document.getElementById('tbx-body').value.trim();
+  if(!title){ alert('Give the toolbox talk a title.'); return; }
+  const to = Array.from(document.querySelectorAll('.tbx-rcpt:checked')).map(c => c.value);
+  if(!to.length){ alert('Pick at least one employee to send to.'); return; }
+  const talk = { id:'tbx_'+Date.now(), title, body:bodyTxt, date:new Date().toISOString().slice(0,10), to, acks:{} };
+  toolboxTalks.push(talk);
+  saveToolboxTalks();
+  // Notify each recipient (Phase 1 = local notification stub)
+  to.forEach(id => { const e = employees.find(x=>x.id===id); if(e) {
+    try{ if(('Notification' in window)&&Notification.permission==='granted') new Notification('QuotaFlo — Toolbox talk', {body:`${e.name}: ${title}`}); }catch(_){}
+  }});
+  hide('toolbox-modal');
+  alert('📋 Toolbox talk sent to '+to.length+' staff member'+(to.length===1?'':'s')+'. They’ll see it in their Safety tab.');
+}
+
+function ackToolboxTalk(talkId){
+  const talk = toolboxTalks.find(t => t.id === talkId);
+  if(!talk || !_empCurrent) return;
+  talk.acks[_empCurrent] = Date.now();
+  saveToolboxTalks();
+  renderEmpSafety();
+}
+
+/* ─── EMPLOYEE MODE — the employee's own basic app ───
+   In Phase 1 this is a local PREVIEW of what the employee sees. In the real
+   build it's served to their own login; the client never receives prices. */
+let _empCurrent = null;
+let _empTab = 'jobs';
+
+function enterEmployeeMode(empId){
+  const emp = employees.find(e => e.id === empId);
+  if(!emp) return;
+  _empCurrent = empId;
+  hide('employees-modal');
+  document.getElementById('emp-mode-name').textContent = emp.name;
+  document.getElementById('emp-mode-av').textContent = (emp.name[0]||'?').toUpperCase();
+  document.getElementById('emp-mode').style.display = 'flex';
+  empTab('jobs');
+}
+function exitEmployeeMode(){
+  document.getElementById('emp-mode').style.display = 'none';
+  _empCurrent = null;
+}
+function empTab(name){
+  _empTab = name;
+  ['jobs','mileage','safety'].forEach(n=>{
+    const t = document.getElementById('emp-tab-'+n);
+    if(t){ t.style.color = (n===name)?'#2563eb':'var(--t3)'; t.style.background = (n===name)?'rgba(37,99,235,.08)':'transparent'; }
+  });
+  if(name==='jobs') renderEmpJobs();
+  else if(name==='mileage') renderEmpMileage();
+  else renderEmpSafety();
+}
+
+function renderEmpJobs(){
+  const body = document.getElementById('emp-mode-body');
+  const mine = scheduledJobs
+    .filter(j => j.assignedTo === _empCurrent)
+    .sort((a,b) => (a.startDate||'').localeCompare(b.startDate||''));
+  if(!mine.length){
+    body.innerHTML = '<div style="padding:30px 18px;text-align:center;color:var(--t3);font-size:13px;">No jobs booked to you yet.</div>';
+    return;
+  }
+  body.innerHTML = '<div style="font-weight:800;font-size:17px;color:var(--t);margin-bottom:12px;">My Jobs</div>' + mine.map(j => {
+    const t = getJobType(j.type);
+    // Scope + address come from a linked quote, if any. NO pricing, NO materials.
+    let scope = '', address = '';
+    const siteNotes = j.notes ? esc(j.notes) : '';
+    const pj = j.linkedJobId ? jobs.find(x => String(x.id) === String(j.linkedJobId)) : null;
+    const q  = pj && pj.quoteId ? quotes.find(x => x.id === pj.quoteId) : null;
+    if(q){ if(q.scope) scope = esc(q.scope); if(q.address) address = esc(q.address); }
+    return `<div style="background:var(--card);border:1px solid var(--bdr);border-radius:var(--r2);padding:13px;margin-bottom:11px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+        <span style="background:${t.color};color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:7px;">${esc(t.label)}</span>
+        <span style="font-size:12px;color:var(--t2);font-weight:700;">📅 ${esc(j.startDate||'')}${j.endDate&&j.endDate!==j.startDate?' → '+esc(j.endDate):''}</span>
+      </div>
+      <div style="font-weight:800;color:var(--t);font-size:15px;margin-bottom:6px;">${esc(j.title)}</div>
+      ${address?`<div style="font-size:12px;color:var(--t2);margin-bottom:6px;">📍 ${address}</div>`:''}
+      ${scope?`<div style="font-size:12px;color:var(--t2);margin-bottom:6px;line-height:1.6;"><strong style="color:var(--t);">What to do:</strong> ${scope}</div>`:''}
+      ${siteNotes?`<div style="font-size:12px;color:var(--t2);line-height:1.6;"><strong style="color:var(--t);">Site notes:</strong> ${siteNotes}</div>`:''}
+    </div>`;
+  }).join('') + '<div style="font-size:11px;color:var(--t3);text-align:center;padding:4px 8px 8px;">No pricing is shown to employees.</div>';
+}
+
+/* Employee mileage — basic claim calculator + local trip log (per employee). */
+let empTrips = DB.get('empTrips') || [];
+function saveEmpTrips(){ DB.set('empTrips', empTrips); }
+function renderEmpMileage(){
+  if(typeof refreshMileRate === 'function') refreshMileRate();
+  const rate = (typeof RATE==='number' && !isNaN(RATE)) ? RATE : 0.31;
+  const unit = (typeof selCtry!=='undefined' && selCtry && selCtry.distUnit) || 'km';
+  const cur  = (typeof _cur==='function') ? _cur() : '$';
+  const mine = empTrips.filter(t => t.empId === _empCurrent).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const total = mine.reduce((s,t)=>s+(+t.total||0),0);
+  const today = new Date().toISOString().slice(0,10);
+  const body = document.getElementById('emp-mode-body');
+  body.innerHTML = `
+    <div style="font-weight:800;font-size:17px;color:var(--t);margin-bottom:4px;">Mileage</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:12px;">Log work trips to claim. Rate: ${cur}${rate.toFixed(2)} / ${esc(unit)}.</div>
+    <div style="background:var(--card);border:1px solid var(--bdr);border-radius:var(--r2);padding:13px;margin-bottom:14px;">
+      <div class="frm-grp"><label class="frm-lbl">Date</label><input class="frm-inp" id="empm-date" type="date" value="${today}"></div>
+      <div class="frm-grp"><label class="frm-lbl">Distance (${esc(unit)})</label><input class="frm-inp" id="empm-km" type="number" inputmode="decimal" placeholder="0" oninput="empMileagePreview()"></div>
+      <div class="frm-grp"><label class="frm-lbl">Purpose</label><input class="frm-inp" id="empm-purpose" type="text" placeholder="e.g. Depot → Mrs Spout"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;font-weight:700;color:var(--t);">
+        <span style="font-size:13px;color:var(--t2);">Claim</span><span id="empm-preview" style="font-size:17px;">${cur}0.00</span>
+      </div>
+      <button class="btn btn-p" onclick="addEmpTrip()">+ Add trip</button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div class="frm-lbl" style="margin:0;">My trips</div>
+      <div style="font-weight:800;color:var(--ok,#16a34a);">${cur}${total.toFixed(2)}</div>
+    </div>
+    ${mine.length ? mine.map(t=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border:1px solid var(--bdr);border-radius:var(--r2);margin-bottom:7px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;color:var(--t);font-size:13px;">${esc(t.purpose||'Trip')}</div>
+          <div style="font-size:11px;color:var(--t3);">${esc(t.date||'')} · ${(+t.km||0)} ${esc(unit)}</div>
+        </div>
+        <div style="font-weight:700;color:var(--t);">${cur}${(+t.total||0).toFixed(2)}</div>
+        <button onclick="delEmpTrip('${t.id}')" style="background:none;border:none;color:var(--err);cursor:pointer;font-size:16px;">✕</button>
+      </div>`).join('')
+      : '<div style="padding:16px;text-align:center;color:var(--t3);font-size:12px;">No trips logged yet.</div>'}
+  `;
+}
+function empMileagePreview(){
+  const rate = (typeof RATE==='number' && !isNaN(RATE)) ? RATE : 0.31;
+  const cur  = (typeof _cur==='function') ? _cur() : '$';
+  const km = parseFloat(document.getElementById('empm-km').value)||0;
+  const el = document.getElementById('empm-preview');
+  if(el) el.textContent = cur + (km*rate).toFixed(2);
+}
+function addEmpTrip(){
+  const rate = (typeof RATE==='number' && !isNaN(RATE)) ? RATE : 0.31;
+  const km = parseFloat(document.getElementById('empm-km').value)||0;
+  if(km<=0){ alert('Enter the distance travelled.'); return; }
+  empTrips.push({
+    id:'et_'+Date.now(), empId:_empCurrent,
+    date: document.getElementById('empm-date').value || new Date().toISOString().slice(0,10),
+    km, rate, total: +(km*rate).toFixed(2),
+    purpose: document.getElementById('empm-purpose').value.trim()
+  });
+  saveEmpTrips();
+  renderEmpMileage();
+}
+function delEmpTrip(id){
+  empTrips = empTrips.filter(t => t.id !== id);
+  saveEmpTrips();
+  renderEmpMileage();
+}
+
+/* Employee safety — receives toolbox talks pushed from the employer.
+   Each can be acknowledged ("I've read this") for a compliance record. */
+function renderEmpSafety(){
+  const body = document.getElementById('emp-mode-body');
+  const mine = toolboxTalks
+    .filter(t => (t.to||[]).includes(_empCurrent))
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  let html = '<div style="font-weight:800;font-size:17px;color:var(--t);margin-bottom:4px;">Safety</div>'
+    + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">Toolbox talks &amp; safety briefings sent by your employer.</div>';
+  if(!mine.length){
+    html += '<div style="padding:24px 16px;text-align:center;color:var(--t3);font-size:13px;">No toolbox talks yet.</div>';
+  } else {
+    html += mine.map(t=>{
+      const acked = t.acks && t.acks[_empCurrent];
+      return `<div style="background:var(--card);border:1px solid ${acked?'rgba(34,197,94,.4)':'var(--bdr)'};border-radius:var(--r2);padding:13px;margin-bottom:11px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="font-size:18px;">🦺</span>
+          <div style="flex:1;font-weight:800;color:var(--t);font-size:14px;">${esc(t.title)}</div>
+          <span style="font-size:11px;color:var(--t3);">${esc(t.date||'')}</span>
+        </div>
+        ${t.body?`<div style="font-size:12px;color:var(--t2);line-height:1.6;white-space:pre-wrap;margin-bottom:10px;">${esc(t.body)}</div>`:''}
+        ${acked
+          ? '<div style="font-size:12px;font-weight:700;color:#16a34a;">✓ Read &amp; acknowledged</div>'
+          : `<button onclick="ackToolboxTalk('${t.id}')" style="width:100%;background:#2563eb;border:none;color:#fff;font-size:13px;font-weight:700;padding:10px;border-radius:9px;cursor:pointer;">✓ I’ve read this</button>`}
+      </div>`;
+    }).join('');
+  }
+  body.innerHTML = html;
+}
+
 // Get all scheduled jobs that touch a given date string YYYY-MM-DD
 function getJobsForDate(dateStr){
   return scheduledJobs.filter(j => {
@@ -5474,6 +5940,14 @@ function openScheduleJob(id, preDate){
       jobs.map(jb => `<option value="${jb.id}" ${j?.linkedJobId===jb.id?'selected':''}>${esc(jb.title)} — ${esc(jb.client||'')}</option>`).join('');
   }
 
+  // Populate employee assignee picker
+  const asgSel = document.getElementById('sched-assignee');
+  if(asgSel){
+    asgSel.innerHTML = '<option value="">— Unassigned —</option>' +
+      employees.map(e => `<option value="${e.id}" ${j?.assignedTo===e.id?'selected':''}>${esc(e.name)}</option>`).join('') +
+      (employees.length ? '' : '<option value="" disabled>(add staff in Settings → Manage Employees)</option>');
+  }
+
   show('schedule-modal');
 }
 
@@ -5520,6 +5994,7 @@ function saveScheduledJob(){
     }
   }
 
+  const assignedTo = (document.getElementById('sched-assignee')?.value) || null;
   const data = {
     title,
     type: _selectedSchedType || 'other',
@@ -5528,18 +6003,27 @@ function saveScheduledJob(){
     duration,
     notes: document.getElementById('sched-notes').value.trim(),
     linkedJobId: (document.getElementById('sched-link-job')?.value) || null,
+    assignedTo,
   };
 
+  let prevAssignee = null, savedJob = null;
   if(_editingSchedId){
     const j = scheduledJobs.find(x => x.id === _editingSchedId);
-    if(j) Object.assign(j, data);
+    if(j){ prevAssignee = j.assignedTo || null; Object.assign(j, data); savedJob = j; }
   } else {
-    scheduledJobs.push({ id: 'sj_'+Date.now(), ...data, createdAt: Date.now() });
+    savedJob = { id: 'sj_'+Date.now(), ...data, createdAt: Date.now() };
+    scheduledJobs.push(savedJob);
   }
 
   saveScheduledJobsData();
   hide('schedule-modal');
   renderCalendar();
+
+  // Notify the employee if they were just assigned (new assignment or changed)
+  if(assignedTo && assignedTo !== prevAssignee){
+    const emp = employees.find(e => e.id === assignedTo);
+    if(emp) notifyEmployee(emp, savedJob);
+  }
 }
 
 function deleteScheduledJob(){
@@ -6581,10 +7065,12 @@ function toggleP(h){
 
 // ── Backend URL ───────────────────────────────────────────
 const API = 'https://tradeflow-api-88z6.onrender.com';
-// Wake the Render backend early. The free tier sleeps after ~15 min idle, so the
-// first AI call could take 30-60s and make the (working) backend feel disconnected.
-// This fire-and-forget ping warms the server on load so the first action is fast.
-(function warmUpBackend(){ try{ fetch(API + '/', { method:'GET', mode:'no-cors', cache:'no-store' }).catch(function(){}); }catch(e){} })();
+// Public support address shown for account-deletion requests.
+const SUPPORT_EMAIL = 'support.quotaflo@gmail.com';
+// Attach the logged-in user's token to AI calls so the SERVER can gate paid
+// features (expired/unsubscribed → reject). UI gating alone is bypassable;
+// the Render backend is the authority. No token (e.g. admin/offline) → omitted.
+function authHeader(){ const t = DB.get('authToken'); return t ? { 'Authorization': 'Bearer ' + t } : {}; }
 
 // ── Voice options ─────────────────────────────────────────
 const VOICE_OPTIONS = [
@@ -6662,7 +7148,7 @@ async function speak(rawText) {
   try {
     const resp = await fetch(`${API}/api/speak`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
       body: JSON.stringify({ text, speed: VOICE_CFG.speed, volume: VOICE_CFG.volume, voiceId: VOICE_CFG.voiceId }),
     });
     if (!resp.ok) {
@@ -6825,7 +7311,7 @@ async function genQuote(){
     
     const resp = await fetch(`${API}/api/quote`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeader() },
       mode: 'cors',
       body: JSON.stringify({
         transcript: processedTranscript,
@@ -6879,8 +7365,11 @@ async function genQuote(){
   }
 }
 
+// Kept as a thin alias so any old caller routes to the real send path
+// (emailQuote → saves an approval link to Supabase + opens the email draft).
 function sendQuote(){
-  speak('Quote ready to send. Connect to backend to enable email and SMS delivery.');
+  if(typeof emailQuote === 'function') return emailQuote(false);
+  speak('Open a quote first, then tap Send.');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -7312,7 +7801,7 @@ async function analyzePhotos(){
   try {
     const resp=await fetch(`${API}/api/safety`,{
       method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      headers:{'Content-Type':'application/json','Accept':'application/json', ...authHeader()},
       mode:'cors',
       body:JSON.stringify({images,country:selCtry.name,legislation:selCtry.code})
     });
@@ -7784,7 +8273,7 @@ async function generateJSA(){
   try {
     const res = await fetch(`${API}/api/jsa`, {
       method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      headers:{'Content-Type':'application/json','Accept':'application/json', ...authHeader()},
       mode:'cors',
       body: JSON.stringify({ task, site, supervisor, date, trade: profile.company || 'general construction', country: selCtry.name, legislation: selCtry.code })
     });
@@ -9240,7 +9729,7 @@ async function genEmail(){
   try {
     const resp=await fetch(`${API}/api/email`,{
       method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      headers:{'Content-Type':'application/json','Accept':'application/json', ...authHeader()},
       mode:'cors',
       body:JSON.stringify({incomingEmail:inp,replyIntent,senderName:profile.name,companyName:profile.company,style:VOICE_CFG.style||'professional'})
     });
@@ -9263,7 +9752,7 @@ async function genEmailModal(){
   if(!inp){speak('Please type what you want to say first.');return;}
   speak('Writing your reply now.');
   try {
-    const resp=await fetch(`${API}/api/email`,{method:'POST',headers:{'Content-Type':'application/json'},
+    const resp=await fetch(`${API}/api/email`,{method:'POST',headers:{'Content-Type':'application/json', ...authHeader()},
       body:JSON.stringify({replyIntent:inp,senderName:profile.name,companyName:profile.company,style:VOICE_CFG.style})});
     const data=await resp.json();
     document.getElementById('em-txt').textContent=data.draft||'Could not generate reply.';
@@ -9505,117 +9994,7 @@ function clearAllData(){
   jobs=[]; materials=[]; trips=[]; invoices=[];
   DB.set('jobs',[]); DB.set('materials',[]); DB.set('trips',[]); DB.set('invoices',[]);
   qSeq=1; DB.set('qSeq',1);
-  initDash();
-}
-
-// ═══════════════════════════════════════════════════════════
-// ENCRYPTED BACKUP / RESTORE  (Web Crypto AES-GCM, passphrase-derived key)
-// Real encryption: PBKDF2-SHA-256 (600k) -> AES-GCM 256. Random salt + IV per
-// file. Passphrase is never stored. Wrong passphrase fails closed (GCM auth tag).
-// ═══════════════════════════════════════════════════════════
-const BACKUP_PBKDF2_ITERS = 600000;
-function _b64(buf){ return btoa(String.fromCharCode.apply(null, new Uint8Array(buf))); }
-function _unb64(s){ return Uint8Array.from(atob(s), function(c){ return c.charCodeAt(0); }); }
-
-async function _backupDeriveKey(passphrase, salt, usages){
-  const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey(
-    { name:'PBKDF2', salt: salt, iterations: BACKUP_PBKDF2_ITERS, hash:'SHA-256' },
-    baseKey, { name:'AES-GCM', length:256 }, false, usages || ['encrypt','decrypt']
-  );
-}
-
-// Every QuotaFlo localStorage key (tf_*) EXCEPT device-only PIN/auth tokens,
-// which shouldn't travel in a portable backup.
-function _collectBackupData(){
-  const SKIP = ['tf_pin','tf_authToken','tf_refreshToken','tf_lock_time'];
-  const out = {};
-  for(let i=0;i<localStorage.length;i++){
-    const k = localStorage.key(i);
-    if(k && k.indexOf('tf_')===0 && SKIP.indexOf(k)===-1){ out[k] = localStorage.getItem(k); }
-  }
-  return out;
-}
-
-async function backupData(){
-  try{
-    if(!(window.crypto && crypto.subtle)){ alert('Backup needs a secure (https) connection. Open the app from its web address and try again.'); return; }
-    const pass = prompt('Choose a password to protect this backup file.\n\nYou will need this exact password to restore it. Write it down somewhere safe — we cannot recover it for you.');
-    if(pass===null) return;
-    if(pass.length < 6){ alert('Please use a password of at least 6 characters.'); return; }
-    const pass2 = prompt('Re-enter the same password to confirm.');
-    if(pass2===null) return;
-    if(pass !== pass2){ alert('The passwords did not match. Backup cancelled — please try again.'); return; }
-
-    const payload = JSON.stringify({ data: _collectBackupData(), savedAt: new Date().toISOString() });
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const iv   = crypto.getRandomValues(new Uint8Array(12));
-    const key  = await _backupDeriveKey(pass, salt, ['encrypt']);
-    const ct   = await crypto.subtle.encrypt({ name:'AES-GCM', iv: iv }, key, new TextEncoder().encode(payload));
-
-    const file = {
-      app:'QuotaFlo', type:'quotaflo-backup', version:1,
-      kdf:{ name:'PBKDF2', hash:'SHA-256', iterations: BACKUP_PBKDF2_ITERS }, cipher:'AES-GCM',
-      salt:_b64(salt), iv:_b64(iv), ciphertext:_b64(ct)
-    };
-    const blob = new Blob([JSON.stringify(file)], { type:'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'quotaflo-backup-' + new Date().toISOString().slice(0,10) + '.json';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-    alert('✅ Backup saved.\n\nKeep the file somewhere safe (email it to yourself, or save to cloud storage). You will need your password to restore it.');
-  }catch(e){
-    alert('Sorry — the backup could not be created. ' + (e && e.message ? e.message : ''));
-  }
-}
-
-function restoreDataPrompt(){
-  const inp = document.getElementById('restore-file-input');
-  if(inp){ inp.value=''; inp.click(); }
-}
-
-async function restoreDataFile(event){
-  const file = event && event.target && event.target.files && event.target.files[0];
-  if(!file) return;
-  try{
-    if(!(window.crypto && crypto.subtle)){ alert('Restore needs a secure (https) connection. Open the app from its web address and try again.'); return; }
-    const text = await file.text();
-    let parsed;
-    try{ parsed = JSON.parse(text); }catch(e){ alert('That file is not a valid QuotaFlo backup.'); return; }
-    if(!parsed || parsed.type !== 'quotaflo-backup' || !parsed.ciphertext){ alert('That file is not a QuotaFlo backup.'); return; }
-
-    const pass = prompt('Enter the password for this backup file.');
-    if(pass===null) return;
-
-    let plain;
-    try{
-      const salt = _unb64(parsed.salt), iv = _unb64(parsed.iv), ct = _unb64(parsed.ciphertext);
-      const iters = (parsed.kdf && parsed.kdf.iterations) || BACKUP_PBKDF2_ITERS;
-      const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
-      const key = await crypto.subtle.deriveKey({ name:'PBKDF2', salt: salt, iterations: iters, hash:'SHA-256' }, baseKey, { name:'AES-GCM', length:256 }, false, ['decrypt']);
-      const buf = await crypto.subtle.decrypt({ name:'AES-GCM', iv: iv }, key, ct);
-      plain = new TextDecoder().decode(buf);
-    }catch(e){
-      alert('Could not open the backup — the password may be wrong, or the file is damaged. Nothing on this device was changed.');
-      return;
-    }
-
-    let obj;
-    try{ obj = JSON.parse(plain); }catch(e){ alert('The backup contents were unreadable. Nothing was changed.'); return; }
-    const data = obj && obj.data;
-    if(!data || typeof data!=='object'){ alert('The backup had no data to restore. Nothing was changed.'); return; }
-
-    const count = Object.keys(data).length;
-    const when = obj.savedAt ? (' from ' + new Date(obj.savedAt).toLocaleString('en-NZ')) : '';
-    if(!confirm('Restore this backup' + when + '?\n\nThis REPLACES the jobs, clients, quotes, invoices, materials and settings on this device with the ones in the backup ('+count+' items). This cannot be undone.\n\nYour PIN and login stay as they are.')) return;
-
-    Object.keys(data).forEach(function(k){ try{ localStorage.setItem(k, data[k]); }catch(e){} });
-    alert('✅ Restore complete. The app will now reload with your restored data.');
-    location.reload();
-  }catch(e){
-    alert('Sorry — the restore could not be completed. ' + (e && e.message ? e.message : '') + '\nNothing was changed.');
-  }
+  initDash(); 
 }
 
 async function doLogout(){
@@ -9643,6 +10022,63 @@ async function doLogout(){
   DB.set('subStatus', null);
   DB.set('trialStart', null);
   // Reload to trigger auth screen
+  location.reload();
+}
+
+// ───────────────────────────────────────────────────────────
+// DELETE ACCOUNT — Google Play requirement (in-app deletion path).
+// Wipes ALL on-device data (the part we fully control) and best-effort
+// asks the backend to delete the account record + server-side data.
+// Honest fallback: if the server can't confirm, point the user at the
+// web/email deletion path so it can still be completed.
+// ───────────────────────────────────────────────────────────
+async function deleteAccount(){
+  if(!confirm('Delete your QuotaFlo account?\n\nThis permanently erases ALL data on this device — jobs, quotes, invoices, clients and your profile — and requests deletion of your account on our servers.\n\nThis CANNOT be undone. Export a backup first if you want a copy.')) return;
+  const typed = prompt('This is permanent. Type DELETE (capital letters) to confirm:');
+  if(typed !== 'DELETE'){
+    if(typed !== null) alert('Account deletion cancelled — you didn’t type DELETE.');
+    return;
+  }
+
+  // 1) Best-effort: ask the server to delete the account record + server-side
+  //    data (Supabase auth user + quote_approvals). Requires the backend
+  //    /api/delete-account endpoint; degrades gracefully if it isn't live yet.
+  const token = DB.get('authToken');
+  let serverConfirmed = false;
+  if(token && navigator.onLine){
+    try {
+      const res = await fetch(`${API}/api/delete-account`, {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader())
+      });
+      serverConfirmed = res.ok;
+    } catch(e){ /* offline or endpoint not deployed — handled in the message below */ }
+    // Revoke the session token regardless.
+    try {
+      await fetch('https://gnkxxcjlgtihrijqjgbk.supabase.co/auth/v1/logout', {
+        method: 'POST',
+        headers: { 'apikey': 'sb_publishable_YocoX0gXkyfMoauIJSwWdQ_Xc1FHzMt', 'Authorization': `Bearer ${token}` }
+      });
+    } catch(e){}
+  }
+
+  // 2) Wipe ALL local data — every tf_* (app data/auth) and qa_* (quote-approval
+  //    status) key. This is the part we control completely and always runs.
+  try {
+    const toRemove = [];
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && (k.indexOf('tf_')===0 || k.indexOf('qa_')===0)) toRemove.push(k);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+  } catch(e){}
+
+  // 3) Tell the user honestly what happened.
+  if(serverConfirmed){
+    alert('Your account and all data on this device have been deleted.');
+  } else {
+    alert('All data on this device has been deleted.\n\nWe couldn’t confirm deletion of your online account just now (you may be offline, or it’s still processing). To be sure it’s fully removed, email '+SUPPORT_EMAIL+' from your account email address and we’ll delete it within 30 days.');
+  }
   location.reload();
 }
 
@@ -9821,30 +10257,83 @@ function showTrialLock(){
   
   lock.innerHTML = `
     <div style="max-width:380px;width:100%;text-align:center;">
-      <div style="width:88px;height:88px;border-radius:24px;background:linear-gradient(145deg,#dc2626,#991b1b);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;box-shadow:0 12px 40px rgba(220,38,38,.5),inset 0 1px 0 rgba(255,255,255,.2);">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="#fff" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.3));"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
+      <div style="width:92px;height:92px;margin:0 auto 18px;filter:drop-shadow(0 12px 34px rgba(21,64,200,.6));">
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">
+          <defs>
+            <radialGradient id="V4Bg" cx="35%" cy="28%" r="80%">
+              <stop offset="0%" stop-color="#3a6ee0"/>
+              <stop offset="50%" stop-color="#1a45c8"/>
+              <stop offset="100%" stop-color="#0e2d9e"/>
+            </radialGradient>
+            <radialGradient id="V4QSh" cx="68%" cy="68%" r="55%">
+              <stop offset="0%" stop-color="rgba(8,24,80,.45)"/>
+              <stop offset="100%" stop-color="rgba(8,24,80,0)"/>
+            </radialGradient>
+            <linearGradient id="V4S1" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#00f0ff" stop-opacity="1"/>
+              <stop offset="50%" stop-color="#00c8ff" stop-opacity=".9"/>
+              <stop offset="100%" stop-color="#0868d8" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="V4S2" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#00d8ff" stop-opacity="1"/>
+              <stop offset="50%" stop-color="#00aaee" stop-opacity=".88"/>
+              <stop offset="100%" stop-color="#0558c0" stop-opacity="0"/>
+            </linearGradient>
+            <filter id="V4Gl" x="-15%" y="-300%" width="130%" height="700%">
+              <feGaussianBlur stdDeviation="4" result="b"/>
+              <feFlood flood-color="#00e8ff" flood-opacity=".9" result="c"/>
+              <feComposite in="c" in2="b" operator="in" result="g"/>
+              <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="V4Dr" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="2" dy="6" stdDeviation="7" flood-color="#040e40" flood-opacity=".6"/>
+            </filter>
+          </defs>
+          <rect width="200" height="200" rx="42" fill="url(#V4Bg)"/>
+          <ellipse cx="65" cy="38" rx="68" ry="34" fill="rgba(255,255,255,.11)"/>
+          <path d="M 104 157 C 116 172, 150 132, 196 144" fill="none" stroke="url(#V4S1)" stroke-width="15" stroke-linecap="round" filter="url(#V4Gl)"/>
+          <path d="M 107 155 C 118 170, 149 133, 192 143" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="5" stroke-linecap="round"/>
+          <path d="M 111 174 C 123 190, 160 150, 196 160" fill="none" stroke="url(#V4S2)" stroke-width="11" stroke-linecap="round" filter="url(#V4Gl)"/>
+          <path d="M 114 173 C 125 188, 159 151, 192 159" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="3.5" stroke-linecap="round"/>
+          <g filter="url(#V4Dr)">
+            <path d="M 119 140 A 54 54 0 1 0 101 147" fill="none" stroke="#ffffff" stroke-width="27" stroke-linecap="round"/>
+            <path d="M 119 140 A 54 54 0 1 0 101 147" fill="none" stroke="url(#V4QSh)" stroke-width="27"/>
+            <path d="M 119 140 A 54 54 0 1 0 101 147" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="10"/>
+            <line x1="101" y1="147" x2="157" y2="180" stroke="#ffffff" stroke-width="27" stroke-linecap="round"/>
+            <line x1="97" y1="147" x2="151" y2="178" stroke="rgba(255,255,255,.5)" stroke-width="7" stroke-linecap="round"/>
+            <line x1="106" y1="148" x2="162" y2="181" stroke="rgba(6,18,70,.3)" stroke-width="7" stroke-linecap="round"/>
+          </g>
+          <rect width="200" height="200" rx="42" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="2"/>
+        </svg>
       </div>
-      
-      <h1 style="font-family:'Poppins',sans-serif;font-size:28px;font-weight:700;color:#fff;margin:0 0 8px;">Trial Ended</h1>
+
+      <div style="font-family:'Poppins',sans-serif;font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px;margin-bottom:6px;">Quota<span style="color:#1db7ff;">Flo</span><span style="display:inline-block;font-size:11px;background:linear-gradient(145deg,#168dff,#0d6cff);color:#fff;padding:2px 7px;border-radius:6px;font-weight:800;letter-spacing:.4px;vertical-align:middle;margin-left:6px;box-shadow:0 0 10px rgba(22,141,255,.6);">AI</span></div>
+
+      <h1 style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:700;color:#fff;margin:14px 0 8px;">Trial Ended</h1>
       <p style="font-size:15px;color:rgba(255,255,255,.7);margin:0 0 4px;line-height:1.5;">Hey ${esc(userName)},</p>
       <p style="font-size:14px;color:rgba(255,255,255,.6);margin:0 0 28px;line-height:1.6;">Your 7-day free trial of QuotaFlo AI has ended. Subscribe to keep using all the voice quote, scope generation, safety pack and income tracking features.</p>
-      
-      <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:20px;margin-bottom:20px;box-shadow:0 4px 20px rgba(0,0,0,.3);">
-        <div style="font-size:11px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;">QuotaFlo AI Pro</div>
+
+      <div style="background:linear-gradient(160deg,rgba(58,110,224,.16),rgba(13,45,158,.10));border:1px solid rgba(29,183,255,.28);border-radius:16px;padding:20px;margin-bottom:20px;box-shadow:0 8px 30px rgba(8,24,80,.45),0 0 24px rgba(0,200,255,.10),inset 0 1px 0 rgba(255,255,255,.08);">
+        <div style="font-size:11px;color:#7ec9ff;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;font-weight:700;">QuotaFlo AI Pro</div>
         <div style="font-size:36px;font-weight:700;color:#fff;line-height:1;margin-bottom:4px;">$79<span style="font-size:16px;color:rgba(255,255,255,.5);font-weight:500;">/month</span></div>
         <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:18px;">Cancel anytime · NZD</div>
-        
-        <button onclick="openSubscribe()" style="width:100%;padding:14px;border-radius:12px;background:linear-gradient(145deg,#3b82f6 0%,#2563eb 60%,#1d4ed8 100%);color:#fff;border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 6px 20px rgba(37,99,235,.4),inset 0 1px 0 rgba(255,255,255,.18);">
+
+        <button onclick="openSubscribe()" style="width:100%;padding:14px;border-radius:12px;background:linear-gradient(145deg,#2bb6ff 0%,#168dff 55%,#0d6cff 100%);color:#fff;border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 6px 22px rgba(22,141,255,.5),0 0 18px rgba(0,200,255,.35),inset 0 1px 0 rgba(255,255,255,.28);">
           Subscribe — $79/month
         </button>
       </div>
       
+      ${IS_PLAY_BUILD ? '' : `
       <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:14px;margin-bottom:20px;">
         <div style="font-size:12px;color:#fbbf24;font-weight:600;margin-bottom:4px;">🎁 Beta tester?</div>
-        <div style="font-size:11px;color:rgba(255,255,255,.6);line-height:1.5;margin-bottom:10px;">If you're an early access user, contact Marty to extend your trial.</div>
-        <a href="mailto:marty5883@gmail.com?subject=QuotaFlo%20AI%20-%20Trial%20Extension&body=Hi%20Marty%2C%0A%0AMy%20trial%20has%20ended%20and%20I%27d%20like%20to%20keep%20testing%20the%20app.%20My%20email%20is%3A%20${encodeURIComponent(user?.email||'')}%0A%0AThanks!" style="display:block;width:100%;padding:12px;border-radius:10px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:#fbbf24;font-size:13px;font-weight:600;text-decoration:none;text-align:center;">📧 Contact Marty</a>
-      </div>
-      
+        <div style="font-size:11px;color:rgba(255,255,255,.6);line-height:1.5;margin-bottom:10px;">Enter your beta code for <strong style="color:#fbbf24;">50% off your first 3 months</strong>. The discount is applied at checkout.</div>
+        <div style="display:flex;gap:8px;">
+          <input id="beta-code-input" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="BETA CODE" oninput="this.value=this.value.toUpperCase();this.style.borderColor='rgba(245,158,11,.3)'" onkeydown="if(event.key==='Enter')applyBetaCode()" style="flex:1;min-width:0;padding:12px;border-radius:10px;background:rgba(0,0,0,.25);border:1px solid rgba(245,158,11,.3);color:#fff;font-size:13px;font-weight:600;letter-spacing:1.5px;text-align:center;font-family:'DM Sans',sans-serif;outline:none;">
+          <button onclick="applyBetaCode()" style="flex-shrink:0;padding:12px 16px;border-radius:10px;background:linear-gradient(145deg,#fbbf24,#f59e0b);border:none;color:#1a1206;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 14px rgba(245,158,11,.35);">Apply</button>
+        </div>
+        <a href="mailto:support.quotaflo@gmail.com?subject=QuotaFlo%20AI%20-%20Beta%20Code&body=Hi%20Marty%2C%0A%0AI%27m%20an%20early%20access%20user%20and%20I%27d%20like%20a%20beta%20code.%20My%20email%20is%3A%20${encodeURIComponent(user?.email||'')}%0A%0AThanks!" style="display:block;font-size:11px;color:rgba(245,158,11,.75);text-decoration:none;text-align:center;margin-top:10px;">No code? Contact Marty →</a>
+      </div>`}
+
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button onclick="trialLockLogout()" style="flex:1;padding:12px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Log out</button>
         <button onclick="trialLockAdmin()" style="flex:1;padding:12px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Admin override</button>
@@ -9955,8 +10444,49 @@ async function trialLockAdmin(){
   }
 }
 
-function openSubscribe(){
-  window.open('https://buy.stripe.com/6oUdR27Tge1letx3gw0ZW01', '_blank');
+// ── BUILD / PLATFORM DETECTION ────────────────────────────
+// Distinguishes the Google Play (TWA) build from the plain web/PWA.
+// Google Play policy forbids non-Play payment (Stripe) and "steering" to it
+// for in-app digital subscriptions, so the Stripe paywall + beta-code box must
+// NEVER render inside the Play build. The TWA referrer (android-app://) is only
+// present on the *launch* navigation, so we detect once and remember it.
+function detectPlayBuild(){
+  try{
+    if(DB.get('platform','') === 'play') return true;
+    const ref = document.referrer || '';
+    const qs  = new URLSearchParams(location.search);
+    const isPlay = ref.indexOf('android-app://') === 0 || qs.get('platform') === 'play';
+    if(isPlay){ DB.set('platform','play'); return true; }
+  }catch(e){}
+  return false;
+}
+const IS_PLAY_BUILD = detectPlayBuild();
+
+// Phase 2: implement Google Play Billing here (Digital Goods API + PaymentRequest).
+// Until then, the Play build has no in-app purchase path — show an honest notice.
+function startPlayBilling(){
+  alert('Subscriptions on the Google Play version are coming soon.\n\nFor now, manage your QuotaFlo AI Pro subscription on the web app.');
+}
+
+function openSubscribe(promoCode){
+  // Hard guard: on the Play build we must not open Stripe (policy violation).
+  if(IS_PLAY_BUILD){ startPlayBilling(); return; }
+  // Stripe is the authority on whether a code is valid — we just forward it.
+  // The payment link must have "Allow promotion codes" enabled for this to apply.
+  let url = 'https://buy.stripe.com/6oUdR27Tge1letx3gw0ZW01';
+  if(promoCode){ url += '?prefilled_promo_code=' + encodeURIComponent(promoCode); }
+  window.open(url, '_blank');
+}
+
+// Beta tester redeems a code → forwards to Stripe checkout with the promo
+// pre-filled (e.g. BETA50 = 50% off for the first 3 months). The discount is
+// applied and enforced by Stripe at checkout, never by the client.
+function applyBetaCode(){
+  const el = document.getElementById('beta-code-input');
+  if(!el) return;
+  const code = (el.value || '').trim().toUpperCase();
+  if(!code){ el.focus(); el.style.borderColor = '#f59e0b'; return; }
+  openSubscribe(code);
 }
 
 // Run trial check on app load and every minute while open
@@ -10334,8 +10864,10 @@ setTimeout(()=>{
     const isAdmin = DB.get('isAdmin', false);
     const authUser = DB.get('authUser', null);
     if (isAdmin || authUser) {
-      // Already logged in — enter PIN (or create one if none set yet)
-      enterAfterAuth();
+      // Already logged in — go to lock screen
+      const ls = document.getElementById('lock-screen');
+      ls.classList.remove('hidden');
+      updateLkClock();
     } else {
       // Show auth screen
       showAuthScreen();
@@ -10400,7 +10932,7 @@ async function sendToScan(dataUrl, mediaType, filename){
   try {
     const res = await fetch(`${API}/api/scan-invoice`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeader() },
       mode: 'cors',
       body: JSON.stringify({
         image: dataUrl,
@@ -10632,7 +11164,7 @@ function showAuthScreen(){
     if(await isAdminPassword(pw)){
       DB.set('isAdmin',true);DB.set('subStatus','active');
       overlay.remove();
-      enterAfterAuth();
+      const ls=document.getElementById('lock-screen');ls.classList.remove('hidden');updateLkClock();
     }else{authError='Incorrect admin password';renderAuth();}
   };
 
@@ -10677,10 +11209,6 @@ function showAuthScreen(){
       // Supabase returns { user, session } on success
       if(!data.user){ throw new Error('No user returned. Try again.'); }
       
-      // New account on this device — start with a completely clean slate so no
-      // previous account's data is ever visible to this user.
-      clearLocalBusinessData();
-
       // Save user + access token for future authenticated calls
       DB.set('authUser', {
         id: data.user.id,
@@ -10688,19 +11216,19 @@ function showAuthScreen(){
         name,
         company
       });
-      DB.set('dataOwner', data.user.id);   // tag this device's data as belonging to this account
       DB.set('authToken', data.session?.access_token || null);
       DB.set('refreshToken', data.session?.refresh_token || null);
       DB.set('subStatus', 'trial');
       DB.set('trialStart', Date.now());
-
+      
       if(name){ profile.name = name; }
       if(company){ profile.company = company; }
       save();
-
+      
       overlay.remove();
-      // Brand-new account — make them create their own PIN before entering.
-      openPinSetup(true, function(){ unlockApp(); });
+      const ls = document.getElementById('lock-screen');
+      ls.classList.remove('hidden');
+      updateLkClock();
     }catch(e){
       authError = e.message || 'Signup failed. Try again.';
       renderAuth();
@@ -10733,19 +11261,13 @@ function showAuthScreen(){
       }
       
       if(!data.user){ throw new Error('Login failed. Check your details.'); }
-
-      // Data isolation: if a different account previously used this device, clear
-      // its data so this user only sees their own. Same account → keep their data.
-      const prevOwner = DB.get('dataOwner', null);
-      if(prevOwner && prevOwner !== data.user.id){ clearLocalBusinessData(); }
-
+      
       DB.set('authUser', {
         id: data.user.id,
         email: data.user.email,
         name: data.user.user_metadata?.name || '',
         company: data.user.user_metadata?.company || ''
       });
-      DB.set('dataOwner', data.user.id);
       DB.set('authToken', data.access_token);
       DB.set('refreshToken', data.refresh_token);
       
@@ -10754,9 +11276,11 @@ function showAuthScreen(){
         DB.set('subStatus', 'trial');
         DB.set('trialStart', Date.now());
       }
-
+      
       overlay.remove();
-      enterAfterAuth();
+      const ls = document.getElementById('lock-screen');
+      ls.classList.remove('hidden');
+      updateLkClock();
     }catch(e){
       authError = e.message || 'Login failed. Check your details.';
       renderAuth();
@@ -10785,8 +11309,8 @@ const TOUR = [
   {
     screen: 'materials',
     selector: '#scr-materials .ai-bar',
-    title: '🏗️ Add Your Prices',
-    body: "Head to Materials and add the things you use most — or just scan a supplier invoice and we'll read the prices straight in. Once your prices are in, every voice estimate comes out spot on. It only takes a few minutes and you only do it once."
+    title: '🏗️ Do This First — Add Your Prices!',
+    body: "Before you do anything else, come here to Materials and add your prices. This is really important — it's what makes the voice estimate so powerful. If your prices are in here, every estimate is spot on. If they're not, the AI has to guess. So fill this in first!"
   },
   {
     screen: 'materials',
@@ -10858,7 +11382,7 @@ const TOUR = [
     screen: 'dash',
     selector: null,
     title: "🚀 You're Ready to Go!",
-    body: "That's the full tour! Add a few of your materials prices first (or scan an invoice), then just tap the mic and talk — your estimate comes out priced from your list. Tap the mic button any time to ask your AI assistant to create an estimate, find a job, or generate a safety plan. Let's get to work!"
+    body: "That's the full tour! The golden rule: add your materials prices first, then the voice estimate does the heavy lifting. Tap the mic button any time to talk to your AI assistant — ask it to create an estimate, find a job, or generate a safety plan. Let's get to work!"
   }
 ];
 
@@ -10949,7 +11473,7 @@ async function tourSpeak(text){
   try {
     const res = await fetch(`${API}/api/speak`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
       body: JSON.stringify({ text, voiceId: 'sgk995upfe3tYLvoGcBN', accent: 'ie', gender: 'f' })
     });
     if(myToken !== _speakToken || !res.ok) return; // superseded by a newer step
@@ -11145,7 +11669,7 @@ function showLegalTab(tab){
 // JESSICA HELP — FAQ + ask anything
 // ═══════════════════════════════════════════════════════════
 const JESSICA_FAQ = [
-  { q: "How do I make a voice estimate?", a: "Tap the mic button at the top of the Voice screen and just describe the job out loud — like 'reroof 180 square metres of Colorsteel, two days labour, for John Smith'. I'll turn it into a priced estimate using your materials list. Add your prices under More → Materials (or scan a supplier invoice) for the sharpest estimates." },
+  { q: "How do I make a voice estimate?", a: "Tap the mic button at the top of the Voice screen and just describe the job out loud — like 'reroof 180 square metres of Colorsteel, two days labour, for John Smith'. I'll turn it into a priced estimate using your materials list. Make sure you've added your materials prices first under More → Materials!" },
   { q: "Why isn't my estimate priced correctly?", a: "The voice estimate uses the prices in your Materials list. If something's priced wrong or showing zero, go to More → Materials and check that item's price is entered. The more prices you add, the more accurate your estimates become." },
   { q: "How do I add my materials prices?", a: "Go to More → Materials. You can type each item and price in manually, or tap the camera button to scan a supplier invoice — I'll read it and import all the prices automatically. Do this before using voice estimates so everything's priced right." },
   { q: "How do I send an estimate to a customer?", a: "Open the estimate and tap 'Email to Customer'. Your customer gets a link where they can tap Accept or Decline. The moment they accept, it automatically becomes an Outstanding invoice and you get a notification in the app and by email." },
@@ -11253,7 +11777,7 @@ async function askJessica(){
   // Otherwise ask the AI backend
   try {
     const res = await fetch(`${API}/api/assistant`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers:{'Content-Type':'application/json', ...authHeader()},
       body: JSON.stringify({
         command: `A tradesperson is asking for help using the QuotaFlo AI app. Their question: "${question}". Answer helpfully and briefly as Jessica, their friendly app guide. Only answer about using the app (estimates, invoices, materials, safety plans, mileage, scheduling, payments). If it's not about the app, gently steer them back. Reply in the "message" field, action "unknown".`,
         context: { country: (selCtry&&selCtry.name)||'New Zealand' }
